@@ -3,10 +3,10 @@
 # Distributed under the conditional MIT/X11 software license,
 # see the accompanying file COPYING
 
-DEPSDIR:=/usr/i686-pc-mingw32
+DEPSDIR:=/usr/x86_64-w64-mingw32
 
-CC := i686-pc-mingw32-gcc
-CXX := i686-pc-mingw32-g++
+CC := x86_64-w64-mingw32-gcc
+CXX := x86_64-w64-mingw32-g++
 
 USE_UPNP:=0
 USE_IPV6:=1
@@ -37,11 +37,11 @@ LIBS= \
  -l z \
  -l gmp
 
-DEFS=-D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE
+DEFS=-D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -DBOOST_USE_WINDOWS_H -DFD_SETSIZE=1024 -DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x501
 DEBUGFLAGS=-g
 xCXXFLAGS=-O2 -w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS) $(CXXFLAGS)
 # enable: ASLR, DEP and large address aware
-xLDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat -Wl,--large-address-aware $(LDFLAGS)
+xLDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat $(LDFLAGS)
 
 TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 
@@ -103,7 +103,7 @@ all: primecoind.exe
 DEFS += -I"$(CURDIR)/leveldb/include"
 DEFS += -I"$(CURDIR)/leveldb/helpers"
 leveldb/libleveldb.a:
-	@echo "Building LevelDB ..." && cd leveldb && TARGET_OS=OS_WINDOWS_CROSSCOMPILE $(MAKE) CC=$(CC) CXX=$(CXX) OPT="$(xCXXFLAGS)" libleveldb.a libmemenv.a && i686-pc-mingw32-ranlib libleveldb.a && i686-pc-mingw32-ranlib libmemenv.a && cd ..
+	@echo "Building LevelDB ..." && cd leveldb && TARGET_OS=OS_WINDOWS_CROSSCOMPILE $(MAKE) CC=$(CC) CXX=$(CXX) OPT="$(xCXXFLAGS)" libleveldb.a libmemenv.a && x86_64-w64-mingw32-ranlib libleveldb.a && x86_64-w64-mingw32-ranlib libmemenv.a && cd ..
 
 obj/build.h: FORCE
 	/bin/sh ../share/genbuild.sh obj/build.h

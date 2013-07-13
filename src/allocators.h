@@ -7,7 +7,7 @@
 
 #include <string.h>
 #include <string>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread.hpp>
 #include <map>
 #include <openssl/crypto.h> // for OPENSSL_cleanse()
 

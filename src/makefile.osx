@@ -53,6 +53,7 @@ LIBS += \
  -lboost_chrono-mt \
  -lssl \
  -lcrypto \
+ -lgmp \
  -lz
 TESTDEFS += -DBOOST_TEST_DYN_LINK
 endif

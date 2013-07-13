@@ -41,7 +41,8 @@ LIBS += \
    -l boost_thread$(BOOST_LIB_SUFFIX) \
    -l db_cxx$(BDB_LIB_SUFFIX) \
    -l ssl \
-   -l crypto
+   -l crypto \
+   -l gmp
 
 TESTLIBS += \
  -Wl,-B$(LMODE) \

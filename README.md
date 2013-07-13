@@ -1,3 +1,20 @@
+Primecoin High Performance Version
+==================================
+
+This is the high performance version of Sunny King's Primecoin tree.
+
+Notable changes:
+ * Use GMP for bignum calculations in the mining threads
+ * Reduced sieve size to 100,000 so that important arrays fit into L1 cache
+ * Replaced some bignum calculations with 64-bit arithmetic inside the sieve
+ * Reduced the amount of memory allocations
+
+Donations are welcome if you want to support my work.
+
+BTC: 1EaHwHBWeoJtSM2jEdx9Su1NcKvdXbsqxX
+LTC: LPD1zDChmqcqKGHFHuLX2JWMMEC5jD5J4j
+XPM: AJHjbkVzHhHugd5bpKDtddVDfhtEB8jQZ4
+
 Bitcoin integration/staging tree
 ================================
 

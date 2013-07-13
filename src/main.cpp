@@ -1122,7 +1122,10 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
 
 bool CheckProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CBigNum& bnProbablePrime, unsigned int& nChainType, unsigned int& nChainLength)
 {
-    if (!CheckPrimeProofOfWork(hashBlockHeader, nBits, bnProbablePrime, nChainType, nChainLength))
+    char *strProbablePrime = BN_bn2hex(&bnProbablePrime);
+    mpz_class mpzProbablePrime(strProbablePrime, 16);
+    OPENSSL_free(strProbablePrime);
+    if (!CheckPrimeProofOfWork(hashBlockHeader, nBits, mpzProbablePrime, nChainType, nChainLength))
         return error("CheckProofOfWork() : check failed for prime proof-of-work");
     return true;
 }
@@ -4607,14 +4610,24 @@ void static BitcoinMiner(CWallet *pwallet)
         unsigned int nTriedMultiplier = 0;
 
         // Primecoin: try to find hash divisible by primorial
-        CBigNum bnHashFactor;
-        Primorial(nPrimorialHashFactor, bnHashFactor);
-        while ((pblock->GetHeaderHash() < hashBlockHeaderLimit || CBigNum(pblock->GetHeaderHash()) % bnHashFactor != 0) && pblock->nNonce < 0xffff0000)
+        mpz_class mpzHashFactor;
+        Primorial(nPrimorialHashFactor, mpzHashFactor);
+        
+        // mustyoshi's patch from https://bitcointalk.org/index.php?topic=251850.msg2689981#msg2689981
+        // with some gmp modifications
+        uint256 phash = pblock->GetHeaderHash();
+        mpz_class mpzHash;
+        mpz_set_uint256(mpzHash.get_mpz_t(), phash);
+        
+        while ((phash < hashBlockHeaderLimit || (mpzHash % mpzHashFactor != 0)) && pblock->nNonce < 0xffff0000) {
             pblock->nNonce++;
+            phash = pblock->GetHeaderHash();
+            mpz_set_uint256(mpzHash.get_mpz_t(), phash);
+        }
         if (pblock->nNonce >= 0xffff0000)
             continue;
         // Primecoin: primorial fixed multiplier
-        CBigNum bnPrimorial;
+        mpz_class mpzPrimorial;
         unsigned int nRoundTests = 0;
         unsigned int nRoundPrimesHit = 0;
         int64 nPrimeTimerStart = GetTimeMicros();
@@ -4632,25 +4645,30 @@ void static BitcoinMiner(CWallet *pwallet)
             if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
                 error("PrimecoinMiner() : primorial decrement overflow");
         }
-        Primorial(nPrimorialMultiplier, bnPrimorial);
+        Primorial(nPrimorialMultiplier, mpzPrimorial);
 
         loop
         {
             unsigned int nTests = 0;
             unsigned int nPrimesHit = 0;
 
-            CBigNum bnMultiplierMin = bnPrimeMin * bnHashFactor / CBigNum(pblock->GetHeaderHash()) + 1;
-            while (bnPrimorial < bnMultiplierMin)
+            mpz_class mpzMultiplierMin = mpzPrimeMin * mpzHashFactor / mpzHash + 1;
+            while (mpzPrimorial < mpzMultiplierMin)
             {
                 if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
                     error("PrimecoinMiner() : primorial minimum overflow");
-                Primorial(nPrimorialMultiplier, bnPrimorial);
+                Primorial(nPrimorialMultiplier, mpzPrimorial);
             }
-            CBigNum bnFixedMultiplier = (bnPrimorial > bnHashFactor)? (bnPrimorial / bnHashFactor) : 1;
+            mpz_class mpzFixedMultiplier;
+            if (mpzPrimorial > mpzHashFactor) {
+                mpzFixedMultiplier = mpzPrimorial / mpzHashFactor;
+            } else {
+                mpzFixedMultiplier = 1;
+            }
 
             // Primecoin: mine for prime chain
             unsigned int nProbableChainLength;
-            if (MineProbablePrimeChain(*pblock, bnFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit))
+            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, mpzHash))
             {
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
                 CheckWork(pblock, *pwalletMain, reservekey);
