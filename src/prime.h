@@ -11,7 +11,7 @@
 #include <gmpxx.h>
 #include <bitset>
 
-static const unsigned int nMaxSieveSize = 100000u;
+static const unsigned int nMaxSieveSize = 1000000u;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
 static const CBigNum bnOne = 1;
 static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;
