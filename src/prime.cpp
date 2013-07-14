@@ -658,27 +658,43 @@ bool CSieveOfEratosthenes::Weave()
             else
                 vCunningham2Multipliers[nBiTwinSeq / 2] = nSolvedMultiplier;
         }
+        
+        // Number of elements that are likely to fit in L1 cache
+        const unsigned int nL1CacheElements = 100000;
+        const unsigned int nArrayRounds = (nMaxSieveSize + nL1CacheElements - 1) / nL1CacheElements;
 
         // Loop over each array one at a time for optimal L1 cache performance
-        for (unsigned int i = 0; i < nChainLength; i++)
-        {
-            unsigned int nSolvedMultiplier = vCunningham1Multipliers[i];
-            for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nMaxSieveSize; nVariableMultiplier += nPrime)
-                vfCompositeCunningham1[nVariableMultiplier] = true;
+        for (unsigned int j = 0; j < nArrayRounds; j++) {
+            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nMaxSieveSize);
+            for (unsigned int i = 0; i < nChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vCunningham1Multipliers[i];
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                    vfCompositeCunningham1[nVariableMultiplier] = true;
+                vCunningham1Multipliers[i] = nVariableMultiplier;
+            }
         }
 
-        for (unsigned int i = 0; i < nChainLength; i++)
-        {
-            unsigned int nSolvedMultiplier = vCunningham2Multipliers[i];
-            for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nMaxSieveSize; nVariableMultiplier += nPrime)
-                vfCompositeCunningham2[nVariableMultiplier] = true;
+        for (unsigned int j = 0; j < nArrayRounds; j++) {
+            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nMaxSieveSize);
+            for (unsigned int i = 0; i < nChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vCunningham2Multipliers[i];
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                    vfCompositeCunningham2[nVariableMultiplier] = true;
+                vCunningham2Multipliers[i] = nVariableMultiplier;
+            }
         }
         
-        for (unsigned int i = 0; i < nChainLength; i++)
-        {
-            unsigned int nSolvedMultiplier = vBiTwinMultipliers[i];
-            for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nMaxSieveSize; nVariableMultiplier += nPrime)
-                vfCompositeBiTwin[nVariableMultiplier] = true;
+        for (unsigned int j = 0; j < nArrayRounds; j++) {
+            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nMaxSieveSize);
+            for (unsigned int i = 0; i < nChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vBiTwinMultipliers[i];
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                    vfCompositeBiTwin[nVariableMultiplier] = true;
+                vBiTwinMultipliers[i] = nVariableMultiplier;
+            }
         }
         
         nPrimeSeq++;
