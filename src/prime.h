@@ -10,7 +10,6 @@
 #include <gmp.h>
 #include <gmpxx.h>
 #include <bitset>
-#include <immintrin.h>
 
 static const unsigned int nMaxSieveSize = 1000000u;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
