@@ -10,6 +10,7 @@
 #include <gmp.h>
 #include <gmpxx.h>
 #include <bitset>
+#include <immintrin.h>
 
 static const unsigned int nMaxSieveSize = 1000000u;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
@@ -113,7 +114,28 @@ public:
     
     void CombineCandidates()
     {
-        vfCandidates = ~(vfCompositeCunningham1 & vfCompositeCunningham2 & vfCompositeBiTwin);
+        //vfCandidates = ~(vfCompositeCunningham1 & vfCompositeCunningham2 & vfCompositeBiTwin);
+
+        // Faster version (not exactly clean but much faster)
+        unsigned char *cCandidates = (unsigned char *)&vfCandidates;
+        unsigned char *cCompositeCunningham1 = (unsigned char *)&vfCompositeCunningham1;
+        unsigned char *cCompositeCunningham2 = (unsigned char *)&vfCompositeCunningham2;
+        unsigned char *cCompositeBiTwin = (unsigned char *)&vfCompositeBiTwin;
+        const unsigned int nBytes = sizeof(vfCandidates);
+
+        unsigned long *lCandidates = (unsigned long *)cCandidates;
+        unsigned long *lCompositeCunningham1 = (unsigned long *)cCompositeCunningham1;
+        unsigned long *lCompositeCunningham2 = (unsigned long *)cCompositeCunningham2;
+        unsigned long *lCompositeBiTwin = (unsigned long *)cCompositeBiTwin;
+        const unsigned int nLongs = nBytes / sizeof(unsigned long);
+        for (unsigned int i = 0; i < nLongs; i++) {
+            lCandidates[i] = ~(lCompositeCunningham1[i] & lCompositeCunningham2[i] & lCompositeBiTwin[i]);
+        }
+        const unsigned int nBytesProcessed = sizeof(unsigned long) * nLongs;
+
+        for (unsigned int i = nBytesProcessed; i < nBytes; i++) {
+            cCandidates[i] = ~(cCompositeCunningham1[i] & cCompositeCunningham2[i] & cCompositeBiTwin[i]);
+        }
     }
 
     // Get total number of candidates for power test
