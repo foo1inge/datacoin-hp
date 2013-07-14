@@ -4651,6 +4651,7 @@ void static BitcoinMiner(CWallet *pwallet)
         {
             unsigned int nTests = 0;
             unsigned int nPrimesHit = 0;
+            unsigned int nChainsHit = 0;
 
             mpz_class mpzMultiplierMin = mpzPrimeMin * mpzHashFactor / mpzHash + 1;
             while (mpzPrimorial < mpzMultiplierMin)
@@ -4668,7 +4669,7 @@ void static BitcoinMiner(CWallet *pwallet)
 
             // Primecoin: mine for prime chain
             unsigned int nProbableChainLength;
-            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, mpzHash))
+            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, nChainsHit, mpzHash))
             {
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
                 CheckWork(pblock, *pwalletMain, reservekey);
@@ -4681,16 +4682,19 @@ void static BitcoinMiner(CWallet *pwallet)
             // Meter primes/sec
             static int64 nPrimeCounter;
             static int64 nTestCounter;
+            static int64 nChainCounter;
             if (nHPSTimerStart == 0)
             {
                 nHPSTimerStart = GetTimeMillis();
                 nPrimeCounter = 0;
                 nTestCounter = 0;
+                nChainCounter = 0;
             }
             else
             {
                 nPrimeCounter += nPrimesHit;
                 nTestCounter += nTests;
+                nChainCounter += nChainsHit;
             }
             if (GetTimeMillis() - nHPSTimerStart > 60000)
             {
@@ -4702,14 +4706,16 @@ void static BitcoinMiner(CWallet *pwallet)
                         double dPrimesPerMinute = 60000.0 * nPrimeCounter / (GetTimeMillis() - nHPSTimerStart);
                         dPrimesPerSec = dPrimesPerMinute / 60.0;
                         double dTestsPerMinute = 60000.0 * nTestCounter / (GetTimeMillis() - nHPSTimerStart);
+                        double dChainsPerMinute = 60000.0 * nChainCounter / (GetTimeMillis() - nHPSTimerStart);
                         nHPSTimerStart = GetTimeMillis();
                         nPrimeCounter = 0;
                         nTestCounter = 0;
+                        nChainCounter = 0;
                         static int64 nLogTime = 0;
                         if (GetTime() - nLogTime > 60)
                         {
                             nLogTime = GetTime();
-                            printf("%s primemeter %9.0f prime/h %9.0f test/h\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLogTime).c_str(), dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0);
+                            printf("%s primemeter %9.0f prime/h %9.0f test/h %9.0f %d-chains/h\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLogTime).c_str(), dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0, dChainsPerMinute * 60.0, nStatsChainLength);
                         }
                     }
                 }

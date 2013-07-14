@@ -397,11 +397,12 @@ bool ProbablePrimeChainTest(const mpz_class& mpzPrimeChainOrigin, unsigned int n
 boost::thread_specific_ptr<CSieveOfEratosthenes> psieve;
 
 // Mine probable prime chain of form: n = h * p# +/- 1
-bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, mpz_class& mpzHash)
+bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash)
 {
     nProbableChainLength = 0;
     nTests = 0;
     nPrimesHit = 0;
+    nChainsHit = 0;
 
     if (fNewBlock && psieve.get() != NULL)
     {
@@ -458,6 +459,8 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
         nProbableChainLength = std::max(std::max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
         if(TargetGetLength(nProbableChainLength) >= 1)
             nPrimesHit++;
+        if(TargetGetLength(nProbableChainLength) >= nStatsChainLength)
+            nChainsHit++;
 
         nCurrent = GetTimeMicros();
     }
