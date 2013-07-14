@@ -6,13 +6,16 @@
 
 // Prime Table
 std::vector<unsigned int> vPrimes;
-static const unsigned int nPrimeTableLimit = nMaxSieveSize;
+static unsigned int nSieveSize = nDefaultSieveSize;
 
 void GeneratePrimeTable()
 {
+    nSieveSize = (int)GetArg("-sievesize", nDefaultSieveSize);
+    nSieveSize = std::max(std::min(nSieveSize, nMaxSieveSize), nMinSieveSize);
+    const unsigned nPrimeTableLimit = nSieveSize;
     vPrimes.clear();
     // Generate prime table using sieve of Eratosthenes
-    std::bitset<nPrimeTableLimit> vfComposite = std::bitset<nPrimeTableLimit> ();
+    std::vector<bool> vfComposite (nPrimeTableLimit, false);
     for (unsigned int nFactor = 2; nFactor * nFactor < nPrimeTableLimit; nFactor++)
     {
         if (vfComposite[nFactor])
@@ -413,12 +416,12 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
     {
         // Build sieve
         nStart = GetTimeMicros();
-        CSieveOfEratosthenes *lpsieve = new CSieveOfEratosthenes(block.nBits, mpzHash, mpzFixedMultiplier, pindexPrev);
+        CSieveOfEratosthenes *lpsieve = new CSieveOfEratosthenes(nSieveSize, block.nBits, mpzHash, mpzFixedMultiplier, pindexPrev);
         int64 nSieveRoundLimit = (int)GetArg("-gensieveroundlimitms", 1000);
         while (lpsieve->Weave() && pindexPrev == pindexBest && (GetTimeMicros() - nStart < 1000 * nSieveRoundLimit));
         lpsieve->CombineCandidates();
         if (fDebug && GetBoolArg("-printmining"))
-            printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", lpsieve->GetCandidateCount(), nMaxSieveSize, lpsieve->GetProgressPercentage(), (unsigned int) (GetTimeMicros() - nStart));
+            printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", lpsieve->GetCandidateCount(), nSieveSize, lpsieve->GetProgressPercentage(), (unsigned int) (GetTimeMicros() - nStart));
         psieve.reset(lpsieve);
     }
 
@@ -574,7 +577,7 @@ std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength
 // Get progress percentage of the sieve
 unsigned int CSieveOfEratosthenes::GetProgressPercentage()
 {
-    return std::min(100u, (((nPrimeSeq >= vPrimes.size())? nPrimeTableLimit : vPrimes[nPrimeSeq]) * 100 / nSieveSize));
+    return std::min(100u, (((nPrimeSeq >= vPrimes.size())? nSieveSize : vPrimes[nPrimeSeq]) * 100 / nSieveSize));
 }
 
 // Weave sieve for the next prime in table
@@ -590,6 +593,7 @@ bool CSieveOfEratosthenes::Weave()
 
     // Keep all variables local for max performance
     CBlockIndex* pindexPrev = this->pindexPrev;
+    unsigned int nSieveSize = this->nSieveSize;
 
     // Process only 10% of the primes
     // Most composites are still found
@@ -624,7 +628,7 @@ bool CSieveOfEratosthenes::Weave()
         if (nPrimeSeq >= vPrimesSize)
             break;  // sieve has been completed
         unsigned int nPrime = vPrimes[nPrimeSeq];
-        if (nPrime >= nMaxSieveSize)
+        if (nPrime >= nSieveSize)
             break;  // sieve has been completed
         nFixedFactorMod = mpz_tdiv_r_ui(mpzFixedFactorMod, mpzFixedFactor, nPrime);
         if (nFixedFactorMod == 0)
@@ -661,11 +665,11 @@ bool CSieveOfEratosthenes::Weave()
         
         // Number of elements that are likely to fit in L1 cache
         const unsigned int nL1CacheElements = 100000;
-        const unsigned int nArrayRounds = (nMaxSieveSize + nL1CacheElements - 1) / nL1CacheElements;
+        const unsigned int nArrayRounds = (nSieveSize + nL1CacheElements - 1) / nL1CacheElements;
 
         // Loop over each array one at a time for optimal L1 cache performance
         for (unsigned int j = 0; j < nArrayRounds; j++) {
-            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nMaxSieveSize);
+            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nSieveSize);
             for (unsigned int i = 0; i < nChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vCunningham1Multipliers[i];
@@ -676,7 +680,7 @@ bool CSieveOfEratosthenes::Weave()
         }
 
         for (unsigned int j = 0; j < nArrayRounds; j++) {
-            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nMaxSieveSize);
+            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nSieveSize);
             for (unsigned int i = 0; i < nChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vCunningham2Multipliers[i];
@@ -687,7 +691,7 @@ bool CSieveOfEratosthenes::Weave()
         }
         
         for (unsigned int j = 0; j < nArrayRounds; j++) {
-            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nMaxSieveSize);
+            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nSieveSize);
             for (unsigned int i = 0; i < nChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vBiTwinMultipliers[i];

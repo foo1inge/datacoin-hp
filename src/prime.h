@@ -11,7 +11,9 @@
 #include <gmpxx.h>
 #include <bitset>
 
-static const unsigned int nMaxSieveSize = 1000000u;
+static const unsigned int nMaxSieveSize = 10000000u;
+static const unsigned int nDefaultSieveSize = 1000000u;
+static const unsigned int nMinSieveSize = 100000u;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
 static const CBigNum bnOne = 1;
 static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;
@@ -86,7 +88,7 @@ std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength
 // Sieve of Eratosthenes for proof-of-work mining
 class CSieveOfEratosthenes
 {
-    static const unsigned int nSieveSize = nMaxSieveSize; // size of the sieve
+    unsigned int nSieveSize; // size of the sieve
     unsigned int nBits; // target of the prime chain to search for
     mpz_class mpzFixedFactor; // fixed factor to derive the chain
 
@@ -102,8 +104,9 @@ class CSieveOfEratosthenes
     CBlockIndex* pindexPrev;
 
 public:
-    CSieveOfEratosthenes(unsigned int nBits, mpz_class& mpzHash, mpz_class& mpzFixedMultiplier, CBlockIndex* pindexPrev)
+    CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, mpz_class& mpzHash, mpz_class& mpzFixedMultiplier, CBlockIndex* pindexPrev)
     {
+        this->nSieveSize = nSieveSize;
         this->nBits = nBits;
         this->mpzFixedFactor = mpzFixedMultiplier * mpzHash;
         this->pindexPrev = pindexPrev;
@@ -120,7 +123,7 @@ public:
         unsigned char *cCompositeCunningham1 = (unsigned char *)&vfCompositeCunningham1;
         unsigned char *cCompositeCunningham2 = (unsigned char *)&vfCompositeCunningham2;
         unsigned char *cCompositeBiTwin = (unsigned char *)&vfCompositeBiTwin;
-        const unsigned int nBytes = sizeof(vfCandidates);
+        const unsigned int nBytes = nSieveSize / 8;
 
         unsigned long *lCandidates = (unsigned long *)cCandidates;
         unsigned long *lCompositeCunningham1 = (unsigned long *)cCompositeCunningham1;
@@ -141,7 +144,7 @@ public:
     unsigned int GetCandidateCount()
     {
         unsigned int nCandidates = 0;
-        for (unsigned int nMultiplier = 0; nMultiplier < nMaxSieveSize; nMultiplier++)
+        for (unsigned int nMultiplier = 0; nMultiplier < nSieveSize; nMultiplier++)
         {
             if (vfCandidates[nMultiplier])
                 nCandidates++;
@@ -158,7 +161,7 @@ public:
         loop
         {
             nCandidateMultiplier++;
-            if (nCandidateMultiplier >= nMaxSieveSize)
+            if (nCandidateMultiplier >= nSieveSize)
             {
                 nCandidateMultiplier = 0;
                 return false;
