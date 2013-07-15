@@ -38,7 +38,8 @@ void GeneratePrimeTable()
     mpz_init(mpzTwoInverse);
     const unsigned int nPrimes = vPrimes.size();
     vTwoInverses = std::vector<unsigned int> (nPrimes, 0);
-    for (unsigned int nPrimeSeq = 0; nPrimeSeq < nPrimes; nPrimeSeq++) {
+    for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+    {
         mpz_set_ui(p, vPrimes[nPrimeSeq]);
         if (!mpz_invert(mpzTwoInverse, mpzTwo.get_mpz_t(), p))
             printf("GeneratePrimeTable(): mpz_invert of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
@@ -117,7 +118,8 @@ static bool FermatProbablePrimalityTest(const mpz_class& n, unsigned int& nLengt
     mpz_sub_ui(mpzE, mpzN, 1);
     mpz_init(mpzR);
     mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, mpzN);
-    if (mpz_cmp_ui(mpzR, 1) == 0) {
+    if (mpz_cmp_ui(mpzR, 1) == 0)
+    {
         mpz_clear(mpzN);
         mpz_clear(mpzE);
         mpz_clear(mpzR);
@@ -189,7 +191,8 @@ static bool EulerLagrangeLifchitzPrimalityTest(const mpz_class& n, bool fSophieG
         return error("EulerLagrangeLifchitzPrimalityTest() : invalid n %% 8 = %d, %s", nMod8, (fSophieGermain? "first kind" : "second kind"));
     }
     
-    if (fPassedTest) {
+    if (fPassedTest)
+    {
         mpz_clear(mpzN);
         mpz_clear(mpzE);
         mpz_clear(mpzR);
@@ -208,9 +211,8 @@ static bool EulerLagrangeLifchitzPrimalityTest(const mpz_class& n, bool fSophieG
     mpz_clear(mpzE);
     mpz_clear(mpzR);
     
-    if (nFractionalLength >= (1 << nFractionalBits)) {
+    if (nFractionalLength >= (1 << nFractionalBits))
         return error("EulerLagrangeLifchitzPrimalityTest() : fractional assert");
-    }
     nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
     return false;
 }
@@ -434,7 +436,6 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
         CSieveOfEratosthenes *lpsieve = new CSieveOfEratosthenes(nSieveSize, block.nBits, mpzHash, mpzFixedMultiplier, pindexPrev);
         int64 nSieveRoundLimit = (int)GetArg("-gensieveroundlimitms", 1000);
         while (lpsieve->Weave() && pindexPrev == pindexBest && (GetTimeMicros() - nStart < 1000 * nSieveRoundLimit));
-        lpsieve->CombineCandidates();
         if (fDebug && GetBoolArg("-printmining"))
             printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", lpsieve->GetCandidateCount(), nSieveSize, lpsieve->GetProgressPercentage(), (unsigned int) (GetTimeMicros() - nStart));
         psieve.reset(lpsieve);
@@ -605,8 +606,8 @@ bool CSieveOfEratosthenes::Weave()
 {
     // Faster GMP version
     const unsigned int nChainLength = TargetGetLength(nBits);
-    unsigned int nPrimeSeq = 0;
-    unsigned int vPrimesSize = vPrimes.size();
+    const unsigned int nHalfChainLength = (nChainLength + 1) / 2;
+    const unsigned int nTotalPrimes = vPrimes.size();
 
     // Keep all variables local for max performance
     CBlockIndex* pindexPrev = this->pindexPrev;
@@ -614,48 +615,45 @@ bool CSieveOfEratosthenes::Weave()
 
     // Process only 10% of the primes
     // Most composites are still found
-    vPrimesSize = (uint64)vPrimesSize * 10 / 100;
+    const unsigned int nPrimes = (uint64)nTotalPrimes * 10 / 100;
 
     mpz_t mpzFixedFactor; // fixed factor to derive the chain
     mpz_t mpzFixedFactorMod;
     mpz_t p;
     mpz_t mpzFixedInverse;
-    
-    unsigned long nFixedFactorMod;
-    unsigned long nFixedInverse;
-    unsigned long nTwoInverse;
-    
-    unsigned int vCunningham1Multipliers[nChainLength];
-    unsigned int vCunningham2Multipliers[nChainLength];
-    unsigned int vBiTwinMultipliers[nChainLength];
+
+    unsigned int vCunningham1AMultipliers[nPrimes][nHalfChainLength];
+    unsigned int vCunningham1BMultipliers[nPrimes][nHalfChainLength];
+    unsigned int vCunningham2AMultipliers[nPrimes][nHalfChainLength];
+    unsigned int vCunningham2BMultipliers[nPrimes][nHalfChainLength];
     
     mpz_init_set(mpzFixedFactor, this->mpzFixedFactor.get_mpz_t());
     mpz_init(mpzFixedFactorMod);
     mpz_init(p);
     mpz_init(mpzFixedInverse);
+    
+    memset(vCunningham1AMultipliers, 0, sizeof(vCunningham1AMultipliers));
+    memset(vCunningham1BMultipliers, 0, sizeof(vCunningham1BMultipliers));
+    memset(vCunningham2AMultipliers, 0, sizeof(vCunningham2AMultipliers));
+    memset(vCunningham2BMultipliers, 0, sizeof(vCunningham2BMultipliers));
 
-    loop
+    for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
     {
         if (pindexPrev != pindexBest)
             break;  // new block
-        if (nPrimeSeq >= vPrimesSize)
-            break;  // sieve has been completed
         unsigned int nPrime = vPrimes[nPrimeSeq];
-        if (nPrime >= nSieveSize)
-            break;  // sieve has been completed
-        nFixedFactorMod = mpz_tdiv_r_ui(mpzFixedFactorMod, mpzFixedFactor, nPrime);
+        unsigned long nFixedFactorMod = mpz_tdiv_r_ui(mpzFixedFactorMod, mpzFixedFactor, nPrime);
         if (nFixedFactorMod == 0)
         {
             // Nothing in the sieve is divisible by this prime
-            nPrimeSeq++;
             continue;
         }
         mpz_set_ui(p, nPrime);
         // Find the modulo inverse of fixed factor
         if (!mpz_invert(mpzFixedInverse, mpzFixedFactorMod, p))
             return error("CSieveOfEratosthenes::Weave(): mpz_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-        nFixedInverse = mpz_get_ui(mpzFixedInverse);
-        nTwoInverse = vTwoInverses[nPrimeSeq];
+        unsigned long nFixedInverse = mpz_get_ui(mpzFixedInverse);
+        unsigned long nTwoInverse = vTwoInverses[nPrimeSeq];
 
         // Weave the sieve for the prime
         for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
@@ -667,56 +665,109 @@ bool CSieveOfEratosthenes::Weave()
                 nFixedInverse = (uint64)nFixedInverse * nTwoInverse % nPrime;
 
             if (nBiTwinSeq < nChainLength)
-                vBiTwinMultipliers[nBiTwinSeq] = nSolvedMultiplier;
-            if (((nBiTwinSeq & 1u) == 0))
-                vCunningham1Multipliers[nBiTwinSeq / 2] = nSolvedMultiplier;
-            else
-                vCunningham2Multipliers[nBiTwinSeq / 2] = nSolvedMultiplier;
-        }
-        
-        // Number of elements that are likely to fit in L1 cache
-        const unsigned int nL1CacheElements = 100000;
-        const unsigned int nArrayRounds = (nSieveSize + nL1CacheElements - 1) / nL1CacheElements;
-
-        // Loop over each array one at a time for optimal L1 cache performance
-        for (unsigned int j = 0; j < nArrayRounds; j++) {
-            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nSieveSize);
-            for (unsigned int i = 0; i < nChainLength; i++)
             {
-                unsigned int nVariableMultiplier = vCunningham1Multipliers[i];
-                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
-                    vfCompositeCunningham1[nVariableMultiplier] = true;
-                vCunningham1Multipliers[i] = nVariableMultiplier;
+                if (((nBiTwinSeq & 1u) == 0))
+                    vCunningham1AMultipliers[nPrimeSeq][nBiTwinSeq / 2] = nSolvedMultiplier;
+                else
+                    vCunningham2AMultipliers[nPrimeSeq][nBiTwinSeq / 2] = nSolvedMultiplier;
+            } else {
+                if (((nBiTwinSeq & 1u) == 0))
+                    vCunningham1BMultipliers[nPrimeSeq][(nBiTwinSeq - nChainLength) / 2] = nSolvedMultiplier;
+                else
+                    vCunningham2BMultipliers[nPrimeSeq][(nBiTwinSeq - nChainLength) / 2] = nSolvedMultiplier;
             }
         }
-
-        for (unsigned int j = 0; j < nArrayRounds; j++) {
-            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nSieveSize);
-            for (unsigned int i = 0; i < nChainLength; i++)
-            {
-                unsigned int nVariableMultiplier = vCunningham2Multipliers[i];
-                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
-                    vfCompositeCunningham2[nVariableMultiplier] = true;
-                vCunningham2Multipliers[i] = nVariableMultiplier;
-            }
-        }
-        
-        for (unsigned int j = 0; j < nArrayRounds; j++) {
-            const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nSieveSize);
-            for (unsigned int i = 0; i < nChainLength; i++)
-            {
-                unsigned int nVariableMultiplier = vBiTwinMultipliers[i];
-                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
-                    vfCompositeBiTwin[nVariableMultiplier] = true;
-                vBiTwinMultipliers[i] = nVariableMultiplier;
-            }
-        }
-        
-        nPrimeSeq++;
-        continue;
     }
     
-    this->nPrimeSeq = nPrimeSeq;
+    // Number of elements that are likely to fit in L1 cache
+    const unsigned int nL1CacheElements = 200000;
+    const unsigned int nArrayRounds = (nSieveSize + nL1CacheElements - 1) / nL1CacheElements;
+
+    // Loop over each array one at a time for optimal L1 cache performance
+    for (unsigned int j = 0; j < nArrayRounds; j++)
+    {
+        const unsigned int nMinMultiplier = nL1CacheElements * j;
+        const unsigned int nMaxMultiplier = std::min(nL1CacheElements * (j + 1), nSieveSize);
+        
+        if (pindexPrev != pindexBest)
+            break;  // new block
+        
+        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+        {
+            unsigned int nPrime = vPrimes[nPrimeSeq];
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vCunningham1AMultipliers[nPrimeSeq][i];
+                if (nVariableMultiplier == 0) break;
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                    vfCompositeCunningham1A[nVariableMultiplier] = true;
+                vCunningham1AMultipliers[nPrimeSeq][i] = nVariableMultiplier;
+            }
+        }
+        
+        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+        {
+            unsigned int nPrime = vPrimes[nPrimeSeq];
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vCunningham1BMultipliers[nPrimeSeq][i];
+                if (nVariableMultiplier == 0) break;
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                    vfCompositeCunningham1B[nVariableMultiplier] = true;
+                vCunningham1BMultipliers[nPrimeSeq][i] = nVariableMultiplier;
+            }
+        }
+        
+        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+        {
+            unsigned int nPrime = vPrimes[nPrimeSeq];
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vCunningham2AMultipliers[nPrimeSeq][i];
+                if (nVariableMultiplier == 0) break;
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                    vfCompositeCunningham2A[nVariableMultiplier] = true;
+                vCunningham2AMultipliers[nPrimeSeq][i] = nVariableMultiplier;
+            }
+        }
+        
+        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+        {
+            unsigned int nPrime = vPrimes[nPrimeSeq];
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vCunningham2BMultipliers[nPrimeSeq][i];
+                if (nVariableMultiplier == 0) break;
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                    vfCompositeCunningham2B[nVariableMultiplier] = true;
+                vCunningham2BMultipliers[nPrimeSeq][i] = nVariableMultiplier;
+            }
+        }
+        
+        // Combine all the bitsets
+        // vfCompositeCunningham1 = vfCompositeCunningham1A | vfCompositeCunningham1B
+        // vfCompositeCunningham2 = vfCompositeCunningham2A | vfCompositeCunningham2B
+        // vfCompositeBiTwin = vfCompositeCunningham1A | vfCompositeCunningham2A
+        // vfCandidates = ~(vfCompositeCunningham1 & vfCompositeCunningham2 & vfCompositeBiTwin)
+        {
+            // Fast version
+            const unsigned int nBytes = (nMaxMultiplier - nMinMultiplier) / 8;
+            unsigned long *lCandidates = (unsigned long *)&vfCandidates + (nMinMultiplier / 8 / sizeof(unsigned long));
+            unsigned long *lCompositeCunningham1A = (unsigned long *)&vfCompositeCunningham1A + (nMinMultiplier / 8 / sizeof(unsigned long));
+            unsigned long *lCompositeCunningham1B = (unsigned long *)&vfCompositeCunningham1B + (nMinMultiplier / 8 / sizeof(unsigned long));
+            unsigned long *lCompositeCunningham2A = (unsigned long *)&vfCompositeCunningham2A + (nMinMultiplier / 8 / sizeof(unsigned long));
+            unsigned long *lCompositeCunningham2B = (unsigned long *)&vfCompositeCunningham2B + (nMinMultiplier / 8 / sizeof(unsigned long));
+            const unsigned int nLongs = (nBytes + sizeof(unsigned long) + 1) / sizeof(unsigned long);
+            for (unsigned int i = 0; i < nLongs; i++)
+            {
+                lCandidates[i] = ~((lCompositeCunningham1A[i] | lCompositeCunningham1B[i]) &
+                                (lCompositeCunningham2A[i] | lCompositeCunningham2B[i]) &
+                                (lCompositeCunningham1A[i] | lCompositeCunningham2A[i]));
+            }
+        }
+    }
+    
+    this->nPrimeSeq = nPrimes - 1;
     
     mpz_clear(mpzFixedFactor);
     mpz_clear(mpzFixedFactorMod);

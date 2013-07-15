@@ -94,11 +94,14 @@ class CSieveOfEratosthenes
     unsigned int nSieveSize; // size of the sieve
     unsigned int nBits; // target of the prime chain to search for
     mpz_class mpzFixedFactor; // fixed factor to derive the chain
+    
+    // bitsets that can be combined to obtain the final bitset of candidates
+    std::bitset<nMaxSieveSize> vfCompositeCunningham1A;
+    std::bitset<nMaxSieveSize> vfCompositeCunningham1B;
+    std::bitset<nMaxSieveSize> vfCompositeCunningham2A;
+    std::bitset<nMaxSieveSize> vfCompositeCunningham2B;
 
-    // bitmaps of the sieve, index represents the variable part of multiplier
-    std::bitset<nMaxSieveSize> vfCompositeCunningham1;
-    std::bitset<nMaxSieveSize> vfCompositeCunningham2;
-    std::bitset<nMaxSieveSize> vfCompositeBiTwin;
+    // final set of candidates for probable primality checking
     std::bitset<nMaxSieveSize> vfCandidates;
 
     unsigned int nPrimeSeq; // prime sequence number currently being processed
@@ -115,32 +118,6 @@ public:
         this->pindexPrev = pindexPrev;
         nPrimeSeq = 0;
         nCandidateMultiplier = 0;
-    }
-    
-    void CombineCandidates()
-    {
-        //vfCandidates = ~(vfCompositeCunningham1 & vfCompositeCunningham2 & vfCompositeBiTwin);
-
-        // Faster version (not exactly clean but much faster)
-        unsigned char *cCandidates = (unsigned char *)&vfCandidates;
-        unsigned char *cCompositeCunningham1 = (unsigned char *)&vfCompositeCunningham1;
-        unsigned char *cCompositeCunningham2 = (unsigned char *)&vfCompositeCunningham2;
-        unsigned char *cCompositeBiTwin = (unsigned char *)&vfCompositeBiTwin;
-        const unsigned int nBytes = nSieveSize / 8;
-
-        unsigned long *lCandidates = (unsigned long *)cCandidates;
-        unsigned long *lCompositeCunningham1 = (unsigned long *)cCompositeCunningham1;
-        unsigned long *lCompositeCunningham2 = (unsigned long *)cCompositeCunningham2;
-        unsigned long *lCompositeBiTwin = (unsigned long *)cCompositeBiTwin;
-        const unsigned int nLongs = nBytes / sizeof(unsigned long);
-        for (unsigned int i = 0; i < nLongs; i++) {
-            lCandidates[i] = ~(lCompositeCunningham1[i] & lCompositeCunningham2[i] & lCompositeBiTwin[i]);
-        }
-        const unsigned int nBytesProcessed = sizeof(unsigned long) * nLongs;
-
-        for (unsigned int i = nBytesProcessed; i < nBytes; i++) {
-            cCandidates[i] = ~(cCompositeCunningham1[i] & cCompositeCunningham2[i] & cCompositeBiTwin[i]);
-        }
     }
 
     // Get total number of candidates for power test
