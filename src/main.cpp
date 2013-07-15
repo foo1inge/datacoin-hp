@@ -4683,9 +4683,10 @@ void static BitcoinMiner(CWallet *pwallet)
             static int64 nPrimeCounter;
             static int64 nTestCounter;
             static int64 nChainCounter;
+            int64 nMillisNow = GetTimeMillis();
             if (nHPSTimerStart == 0)
             {
-                nHPSTimerStart = GetTimeMillis();
+                nHPSTimerStart = nMillisNow;
                 nPrimeCounter = 0;
                 nTestCounter = 0;
                 nChainCounter = 0;
@@ -4696,25 +4697,25 @@ void static BitcoinMiner(CWallet *pwallet)
                 nTestCounter += nTests;
                 nChainCounter += nChainsHit;
             }
-            if (GetTimeMillis() - nHPSTimerStart > 60000)
+            if (nMillisNow - nHPSTimerStart > 60000)
             {
                 static CCriticalSection cs;
                 {
                     LOCK(cs);
-                    if (GetTimeMillis() - nHPSTimerStart > 60000)
+                    if (nMillisNow - nHPSTimerStart > 60000)
                     {
-                        double dPrimesPerMinute = 60000.0 * nPrimeCounter / (GetTimeMillis() - nHPSTimerStart);
+                        double dPrimesPerMinute = 60000.0 * nPrimeCounter / (nMillisNow - nHPSTimerStart);
                         dPrimesPerSec = dPrimesPerMinute / 60.0;
-                        double dTestsPerMinute = 60000.0 * nTestCounter / (GetTimeMillis() - nHPSTimerStart);
-                        double dChainsPerMinute = 60000.0 * nChainCounter / (GetTimeMillis() - nHPSTimerStart);
-                        nHPSTimerStart = GetTimeMillis();
+                        double dTestsPerMinute = 60000.0 * nTestCounter / (nMillisNow - nHPSTimerStart);
+                        double dChainsPerMinute = 60000.0 * nChainCounter / (nMillisNow - nHPSTimerStart);
+                        nHPSTimerStart = nMillisNow;
                         nPrimeCounter = 0;
                         nTestCounter = 0;
                         nChainCounter = 0;
                         static int64 nLogTime = 0;
-                        if (GetTime() - nLogTime > 60)
+                        if (nMillisNow - nLogTime > 59000)
                         {
-                            nLogTime = GetTime();
+                            nLogTime = nMillisNow;
                             printf("%s primemeter %9.0f prime/h %9.0f test/h %9.0f %d-chains/h\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLogTime).c_str(), dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0, dChainsPerMinute * 60.0, nStatsChainLength);
                         }
                     }
