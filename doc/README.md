@@ -3,11 +3,13 @@ Primecoin High Performance Version
 
 This is the high performance version of Sunny King's Primecoin tree.
 
-Notable changes:
+Features:
  * Use GMP for bignum calculations in the mining threads
- * Reduced sieve size to 100,000 so that important arrays fit into L1 cache
  * Replaced some bignum calculations with 64-bit arithmetic inside the sieve
  * Reduced the amount of memory allocations
+ * L1 and L2 cache optimizations
+ * Process only 10% of base primes when weaving the sieve
+ * Configurable sieve size
 
 Donations are welcome if you want to support my work.
 
