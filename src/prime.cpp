@@ -6,6 +6,7 @@
 
 // Prime Table
 std::vector<unsigned int> vPrimes;
+std::vector<unsigned int> vTwoInverses;
 static unsigned int nSieveSize = nDefaultSieveSize;
 
 void GeneratePrimeTable()
@@ -30,6 +31,19 @@ void GeneratePrimeTable()
     //BOOST_FOREACH(unsigned int nPrime, vPrimes)
     //    printf(" %u", nPrime);
     printf("\n");
+    
+    mpz_t p;
+    mpz_t mpzTwoInverse;
+    mpz_init(p);
+    mpz_init(mpzTwoInverse);
+    const unsigned int nPrimes = vPrimes.size();
+    vTwoInverses = std::vector<unsigned int> (nPrimes, 0);
+    for (unsigned int nPrimeSeq = 0; nPrimeSeq < nPrimes; nPrimeSeq++) {
+        mpz_set_ui(p, vPrimes[nPrimeSeq]);
+        if (!mpz_invert(mpzTwoInverse, mpzTwo.get_mpz_t(), p))
+            printf("GeneratePrimeTable(): mpz_invert of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
+        vTwoInverses[nPrimeSeq] = mpz_get_ui(mpzTwoInverse);
+    }
 }
 
 // Get next prime number of p
@@ -606,8 +620,6 @@ bool CSieveOfEratosthenes::Weave()
     mpz_t mpzFixedFactorMod;
     mpz_t p;
     mpz_t mpzFixedInverse;
-    mpz_t mpzTwo;
-    mpz_t mpzTwoInverse;
     
     unsigned long nFixedFactorMod;
     unsigned long nFixedInverse;
@@ -621,8 +633,6 @@ bool CSieveOfEratosthenes::Weave()
     mpz_init(mpzFixedFactorMod);
     mpz_init(p);
     mpz_init(mpzFixedInverse);
-    mpz_init_set_ui(mpzTwo, 2);
-    mpz_init(mpzTwoInverse);
 
     loop
     {
@@ -645,9 +655,7 @@ bool CSieveOfEratosthenes::Weave()
         if (!mpz_invert(mpzFixedInverse, mpzFixedFactorMod, p))
             return error("CSieveOfEratosthenes::Weave(): mpz_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
         nFixedInverse = mpz_get_ui(mpzFixedInverse);
-        if (!mpz_invert(mpzTwoInverse, mpzTwo, p))
-            return error("CSieveOfEratosthenes::Weave(): mpz_invert of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-        nTwoInverse = mpz_get_ui(mpzTwoInverse);
+        nTwoInverse = vTwoInverses[nPrimeSeq];
 
         // Weave the sieve for the prime
         for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
@@ -714,8 +722,6 @@ bool CSieveOfEratosthenes::Weave()
     mpz_clear(mpzFixedFactorMod);
     mpz_clear(p);
     mpz_clear(mpzFixedInverse);
-    mpz_clear(mpzTwo);
-    mpz_clear(mpzTwoInverse);
     
     return false;
 }
