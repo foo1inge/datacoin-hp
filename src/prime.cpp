@@ -9,6 +9,8 @@ std::vector<unsigned int> vPrimes;
 std::vector<unsigned int> vTwoInverses;
 static unsigned int nSieveSize = nDefaultSieveSize;
 
+static unsigned int int_invert(unsigned int a, unsigned int nPrime);
+
 void GeneratePrimeTable()
 {
     nSieveSize = (int)GetArg("-sievesize", nDefaultSieveSize);
@@ -32,18 +34,11 @@ void GeneratePrimeTable()
     //    printf(" %u", nPrime);
     printf("\n");
     
-    mpz_t p;
-    mpz_t mpzTwoInverse;
-    mpz_init(p);
-    mpz_init(mpzTwoInverse);
     const unsigned int nPrimes = vPrimes.size();
     vTwoInverses = std::vector<unsigned int> (nPrimes, 0);
     for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
     {
-        mpz_set_ui(p, vPrimes[nPrimeSeq]);
-        if (!mpz_invert(mpzTwoInverse, mpzTwo.get_mpz_t(), p))
-            printf("GeneratePrimeTable(): mpz_invert of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-        vTwoInverses[nPrimeSeq] = mpz_get_ui(mpzTwoInverse);
+        vTwoInverses[nPrimeSeq] = int_invert(2, vPrimes[nPrimeSeq]);
     }
 }
 
@@ -598,6 +593,48 @@ unsigned int CSieveOfEratosthenes::GetProgressPercentage()
     return std::min(100u, (((nPrimeSeq >= vPrimes.size())? nSieveSize : vPrimes[nPrimeSeq]) * 100 / nSieveSize));
 }
 
+static unsigned int int_invert(unsigned int a, unsigned int nPrime)
+{
+    // Extended Euclidean algorithm to calculate the inverse of a in finite field defined by nPrime
+    int rem0 = nPrime, rem1 = a % nPrime, rem2;
+    int aux0 = 0, aux1 = 1, aux2;
+    int quotient, inverse;
+
+    while (1) {
+        if (rem1 <= 1)
+        {
+            inverse = aux1;
+            break;
+        }
+
+        rem2 = rem0 % rem1;
+        quotient = rem0 / rem1;
+        aux2 = -quotient * aux1 + aux0;
+
+        if (rem2 <= 1)
+        {
+            inverse = aux2;
+            break;
+        }
+
+        rem0 = rem1 % rem2;
+        quotient = rem1 / rem2;
+        aux0 = -quotient * aux2 + aux1;
+
+        if (rem0 <= 1)
+        {
+            inverse = aux0;
+            break;
+        }
+
+        rem1 = rem2 % rem0;
+        quotient = rem2 / rem0;
+        aux1 = -quotient * aux0 + aux2;
+    }
+
+    return (inverse + nPrime) % nPrime;
+}
+
 // Weave sieve for the next prime in table
 // Return values:
 //   True  - weaved another prime; nComposite - number of composites removed
@@ -618,9 +655,6 @@ bool CSieveOfEratosthenes::Weave()
     const unsigned int nPrimes = (uint64)nTotalPrimes * 10 / 100;
 
     mpz_t mpzFixedFactor; // fixed factor to derive the chain
-    mpz_t mpzFixedFactorMod;
-    mpz_t p;
-    mpz_t mpzFixedInverse;
 
     unsigned int vCunningham1AMultipliers[nPrimes][nHalfChainLength];
     unsigned int vCunningham1BMultipliers[nPrimes][nHalfChainLength];
@@ -628,32 +662,28 @@ bool CSieveOfEratosthenes::Weave()
     unsigned int vCunningham2BMultipliers[nPrimes][nHalfChainLength];
     
     mpz_init_set(mpzFixedFactor, this->mpzFixedFactor.get_mpz_t());
-    mpz_init(mpzFixedFactorMod);
-    mpz_init(p);
-    mpz_init(mpzFixedInverse);
     
-    memset(vCunningham1AMultipliers, 0, sizeof(vCunningham1AMultipliers));
-    memset(vCunningham1BMultipliers, 0, sizeof(vCunningham1BMultipliers));
-    memset(vCunningham2AMultipliers, 0, sizeof(vCunningham2AMultipliers));
-    memset(vCunningham2BMultipliers, 0, sizeof(vCunningham2BMultipliers));
+    memset(vCunningham1AMultipliers, 0xFF, sizeof(vCunningham1AMultipliers));
+    memset(vCunningham1BMultipliers, 0xFF, sizeof(vCunningham1BMultipliers));
+    memset(vCunningham2AMultipliers, 0xFF, sizeof(vCunningham2AMultipliers));
+    memset(vCunningham2BMultipliers, 0xFF, sizeof(vCunningham2BMultipliers));
 
     for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
     {
         if (pindexPrev != pindexBest)
             break;  // new block
         unsigned int nPrime = vPrimes[nPrimeSeq];
-        unsigned long nFixedFactorMod = mpz_tdiv_r_ui(mpzFixedFactorMod, mpzFixedFactor, nPrime);
+        unsigned int nFixedFactorMod = mpz_tdiv_ui(mpzFixedFactor, nPrime);
         if (nFixedFactorMod == 0)
         {
             // Nothing in the sieve is divisible by this prime
             continue;
         }
-        mpz_set_ui(p, nPrime);
         // Find the modulo inverse of fixed factor
-        if (!mpz_invert(mpzFixedInverse, mpzFixedFactorMod, p))
-            return error("CSieveOfEratosthenes::Weave(): mpz_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-        unsigned long nFixedInverse = mpz_get_ui(mpzFixedInverse);
-        unsigned long nTwoInverse = vTwoInverses[nPrimeSeq];
+        unsigned int nFixedInverse = int_invert(nFixedFactorMod, nPrime);
+        if (!nFixedInverse)
+            return error("CSieveOfEratosthenes::Weave(): int_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
+        unsigned int nTwoInverse = vTwoInverses[nPrimeSeq];
 
         // Weave the sieve for the prime
         for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
@@ -667,14 +697,50 @@ bool CSieveOfEratosthenes::Weave()
             if (nBiTwinSeq < nChainLength)
             {
                 if (((nBiTwinSeq & 1u) == 0))
-                    vCunningham1AMultipliers[nPrimeSeq][nBiTwinSeq / 2] = nSolvedMultiplier;
+                {
+                    // Eliminate duplicates
+                    for (unsigned int i = 0; i < nHalfChainLength; i++) {
+                        unsigned int nStoredMultiplier = vCunningham1AMultipliers[nPrimeSeq][i];
+                        if (nStoredMultiplier == 0xFFFFFFFF || nStoredMultiplier == nSolvedMultiplier) {
+                            vCunningham1AMultipliers[nPrimeSeq][i] = nSolvedMultiplier;
+                            break;
+                        }
+                    }
+                }
                 else
-                    vCunningham2AMultipliers[nPrimeSeq][nBiTwinSeq / 2] = nSolvedMultiplier;
+                {
+                    // Eliminate duplicates
+                    for (unsigned int i = 0; i < nHalfChainLength; i++) {
+                        unsigned int nStoredMultiplier = vCunningham2AMultipliers[nPrimeSeq][i];
+                        if (nStoredMultiplier == 0xFFFFFFFF || nStoredMultiplier == nSolvedMultiplier) {
+                            vCunningham2AMultipliers[nPrimeSeq][i] = nSolvedMultiplier;
+                            break;
+                        }
+                    }
+                }
             } else {
                 if (((nBiTwinSeq & 1u) == 0))
-                    vCunningham1BMultipliers[nPrimeSeq][(nBiTwinSeq - nChainLength) / 2] = nSolvedMultiplier;
+                {
+                    // Eliminate duplicates
+                    for (unsigned int i = 0; i < nHalfChainLength; i++) {
+                        unsigned int nStoredMultiplier = vCunningham1BMultipliers[nPrimeSeq][i];
+                        if (nStoredMultiplier == 0xFFFFFFFF || nStoredMultiplier == nSolvedMultiplier) {
+                            vCunningham1BMultipliers[nPrimeSeq][i] = nSolvedMultiplier;
+                            break;
+                        }
+                    }
+                }
                 else
-                    vCunningham2BMultipliers[nPrimeSeq][(nBiTwinSeq - nChainLength) / 2] = nSolvedMultiplier;
+                {
+                    // Eliminate duplicates
+                    for (unsigned int i = 0; i < nHalfChainLength; i++) {
+                        unsigned int nStoredMultiplier = vCunningham2BMultipliers[nPrimeSeq][i];
+                        if (nStoredMultiplier == 0xFFFFFFFF || nStoredMultiplier == nSolvedMultiplier) {
+                            vCunningham2BMultipliers[nPrimeSeq][i] = nSolvedMultiplier;
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
@@ -698,7 +764,7 @@ bool CSieveOfEratosthenes::Weave()
             for (unsigned int i = 0; i < nHalfChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vCunningham1AMultipliers[nPrimeSeq][i];
-                if (nVariableMultiplier == 0) break;
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
                 for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
                     vfCompositeCunningham1A[nVariableMultiplier] = true;
                 vCunningham1AMultipliers[nPrimeSeq][i] = nVariableMultiplier;
@@ -711,7 +777,7 @@ bool CSieveOfEratosthenes::Weave()
             for (unsigned int i = 0; i < nHalfChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vCunningham1BMultipliers[nPrimeSeq][i];
-                if (nVariableMultiplier == 0) break;
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
                 for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
                     vfCompositeCunningham1B[nVariableMultiplier] = true;
                 vCunningham1BMultipliers[nPrimeSeq][i] = nVariableMultiplier;
@@ -724,7 +790,7 @@ bool CSieveOfEratosthenes::Weave()
             for (unsigned int i = 0; i < nHalfChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vCunningham2AMultipliers[nPrimeSeq][i];
-                if (nVariableMultiplier == 0) break;
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
                 for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
                     vfCompositeCunningham2A[nVariableMultiplier] = true;
                 vCunningham2AMultipliers[nPrimeSeq][i] = nVariableMultiplier;
@@ -737,7 +803,7 @@ bool CSieveOfEratosthenes::Weave()
             for (unsigned int i = 0; i < nHalfChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vCunningham2BMultipliers[nPrimeSeq][i];
-                if (nVariableMultiplier == 0) break;
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
                 for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
                     vfCompositeCunningham2B[nVariableMultiplier] = true;
                 vCunningham2BMultipliers[nPrimeSeq][i] = nVariableMultiplier;
@@ -770,9 +836,6 @@ bool CSieveOfEratosthenes::Weave()
     this->nPrimeSeq = nPrimes - 1;
     
     mpz_clear(mpzFixedFactor);
-    mpz_clear(mpzFixedFactorMod);
-    mpz_clear(p);
-    mpz_clear(mpzFixedInverse);
     
     return false;
 }
