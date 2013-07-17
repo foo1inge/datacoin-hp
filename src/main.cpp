@@ -4694,10 +4694,10 @@ void static BitcoinMiner(CWallet *pwallet)
             else
             {
 #ifdef __GNUC__
-		// Use atomic increment
-		__sync_add_and_fetch(&nPrimeCounter, nPrimesHit);
-		__sync_add_and_fetch(&nTestCounter, nTests);
-		__sync_add_and_fetch(&nChainCounter, nChainsHit);
+                // Use atomic increment
+                __sync_add_and_fetch(&nPrimeCounter, nPrimesHit);
+                __sync_add_and_fetch(&nTestCounter, nTests);
+                __sync_add_and_fetch(&nChainCounter, nChainsHit);
 #else
                 nPrimeCounter += nPrimesHit;
                 nTestCounter += nTests;
