@@ -4680,9 +4680,9 @@ void static BitcoinMiner(CWallet *pwallet)
             nRoundPrimesHit += nPrimesHit;
 
             // Meter primes/sec
-            static int64 nPrimeCounter;
-            static int64 nTestCounter;
-            static int64 nChainCounter;
+            static volatile int64 nPrimeCounter;
+            static volatile int64 nTestCounter;
+            static volatile int64 nChainCounter;
             int64 nMillisNow = GetTimeMillis();
             if (nHPSTimerStart == 0)
             {
@@ -4693,9 +4693,16 @@ void static BitcoinMiner(CWallet *pwallet)
             }
             else
             {
+#ifdef __GNUC__
+		// Use atomic increment
+		__sync_add_and_fetch(&nPrimeCounter, nPrimesHit);
+		__sync_add_and_fetch(&nTestCounter, nTests);
+		__sync_add_and_fetch(&nChainCounter, nChainsHit);
+#else
                 nPrimeCounter += nPrimesHit;
                 nTestCounter += nTests;
                 nChainCounter += nChainsHit;
+#endif
             }
             if (nMillisNow - nHPSTimerStart > 60000)
             {
