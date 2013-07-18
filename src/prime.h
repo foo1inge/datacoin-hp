@@ -106,6 +106,9 @@ class CSieveOfEratosthenes
     unsigned int nCandidateCount; // cached total count of candidates
     unsigned int nCandidateMultiplier; // current candidate for power test
     
+    unsigned int nChainLength;
+    unsigned int nHalfChainLength;
+    
     CBlockIndex* pindexPrev;
     
     unsigned int GetWordNum(unsigned int nBitNum) {
@@ -115,6 +118,9 @@ class CSieveOfEratosthenes
     unsigned long GetBitMask(unsigned int nBitNum) {
         return 1UL << (nBitNum % nWordBits);
     }
+    
+    void AddMultiplier(unsigned int *vMultipliers, const unsigned int nSolvedMultiplier);
+    void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const unsigned int nPrime, unsigned int *vMultipliers);
 
 public:
     CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, mpz_class& mpzHash, mpz_class& mpzFixedMultiplier, CBlockIndex* pindexPrev)
