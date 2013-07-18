@@ -120,7 +120,18 @@ class CSieveOfEratosthenes
     }
     
     void AddMultiplier(unsigned int *vMultipliers, const unsigned int nSolvedMultiplier);
-    void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const unsigned int nPrime, unsigned int *vMultipliers);
+
+    void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const unsigned int nPrime, unsigned int *vMultipliers)
+    {
+        for (unsigned int i = 0; i < nHalfChainLength; i++)
+        {
+            unsigned int nVariableMultiplier = vMultipliers[i];
+            if (nVariableMultiplier == 0xFFFFFFFF) break;
+            for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
+            vMultipliers[i] = nVariableMultiplier;
+        }
+    }
 
 public:
     CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, mpz_class& mpzHash, mpz_class& mpzFixedMultiplier, CBlockIndex* pindexPrev)

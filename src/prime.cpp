@@ -655,18 +655,6 @@ void CSieveOfEratosthenes::AddMultiplier(unsigned int *vMultipliers, const unsig
     }
 }
 
-void CSieveOfEratosthenes::ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const unsigned int nPrime, unsigned int *vMultipliers)
-{
-    for (unsigned int i = 0; i < nHalfChainLength; i++)
-    {
-        unsigned int nVariableMultiplier = vMultipliers[i];
-        if (nVariableMultiplier == 0xFFFFFFFF) break;
-        for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
-            vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
-        vMultipliers[i] = nVariableMultiplier;
-    }
-}
-
 // Weave sieve for the next prime in table
 // Return values:
 //   True  - weaved another prime; nComposite - number of composites removed
