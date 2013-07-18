@@ -135,6 +135,7 @@ public:
         nCandidatesWords = (nSieveSize + nWordBits - 1) / nWordBits;
         nCandidatesBytes = nCandidatesWords * sizeof(unsigned long);
         vfCandidates = (unsigned long *)malloc(nCandidatesBytes);
+        memset(vfCandidates, 0, nCandidatesBytes);
     }
     
     ~CSieveOfEratosthenes()
