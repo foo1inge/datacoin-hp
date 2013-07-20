@@ -24,6 +24,9 @@ template<typename T> class CCheckQueueControl;
   */
 template<typename T> class CCheckQueue {
 private:
+    // Mutex to allow only one control class access at a time
+    boost::mutex controlMutex;
+
     // Mutex to protect the inner state
     boost::mutex mutex;
 
@@ -164,6 +167,7 @@ public:
     CCheckQueueControl(CCheckQueue<T> *pqueueIn) : pqueue(pqueueIn), fDone(false) {
         // passed queue is supposed to be unused, or NULL
         if (pqueue != NULL) {
+            pqueue->controlMutex.lock();
             assert(pqueue->nTotal == pqueue->nIdle);
             assert(pqueue->nTodo == 0);
             assert(pqueue->fAllOk == true);
@@ -174,6 +178,7 @@ public:
         if (pqueue == NULL)
             return true;
         bool fRet = pqueue->Wait();
+        pqueue->controlMutex.unlock();
         fDone = true;
         return fRet;
     }
