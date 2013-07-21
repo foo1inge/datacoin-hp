@@ -38,6 +38,9 @@ bool PrimeTableGetPreviousPrime(unsigned int& p);
 
 // Compute primorial number p#
 void Primorial(unsigned int p, mpz_class& mpzPrimorial);
+// Compute Primorial number p#
+// Fast 32-bit version assuming that p <= 23
+unsigned int PrimorialFast(unsigned int p);
 // Compute the first primorial number greater than or equal to bn
 void PrimorialAt(mpz_class& bn, mpz_class& mpzPrimorial);
 

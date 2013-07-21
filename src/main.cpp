@@ -4607,8 +4607,7 @@ void static BitcoinMiner(CWallet *pwallet)
         unsigned int nTriedMultiplier = 0;
 
         // Primecoin: try to find hash divisible by primorial
-        mpz_class mpzHashFactor;
-        Primorial(nPrimorialHashFactor, mpzHashFactor);
+        unsigned int nHashFactor = PrimorialFast(nPrimorialHashFactor);
 
         // Based on mustyoshi's patch from https://bitcointalk.org/index.php?topic=251850.msg2689981#msg2689981
         uint256 phash;
@@ -4626,7 +4625,7 @@ void static BitcoinMiner(CWallet *pwallet)
 
             // Check that the hash is divisible by the fixed primorial
             mpz_set_uint256(mpzHash.get_mpz_t(), phash);
-            if (!mpz_divisible_p(mpzHash.get_mpz_t(), mpzHashFactor.get_mpz_t())) {
+            if (!mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) {
                 pblock->nNonce++;
                 continue;
             }
@@ -4660,7 +4659,7 @@ void static BitcoinMiner(CWallet *pwallet)
         Primorial(nPrimorialMultiplier, mpzPrimorial);
 
         // Primecoin: adjust round primorial so that the generated prime candidates meet the minimum
-        mpz_class mpzMultiplierMin = mpzPrimeMin * mpzHashFactor / mpzHash + 1;
+        mpz_class mpzMultiplierMin = mpzPrimeMin * nHashFactor / mpzHash + 1;
         while (mpzPrimorial < mpzMultiplierMin)
         {
             if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
@@ -4668,8 +4667,8 @@ void static BitcoinMiner(CWallet *pwallet)
             Primorial(nPrimorialMultiplier, mpzPrimorial);
         }
         mpz_class mpzFixedMultiplier;
-        if (mpzPrimorial > mpzHashFactor) {
-            mpzFixedMultiplier = mpzPrimorial / mpzHashFactor;
+        if (mpzPrimorial > nHashFactor) {
+            mpzFixedMultiplier = mpzPrimorial / nHashFactor;
         } else {
             mpzFixedMultiplier = 1;
         }
