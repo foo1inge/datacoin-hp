@@ -4619,7 +4619,7 @@ void static BitcoinMiner(CWallet *pwallet)
         mpz_class mpzHash;
         mpz_set_uint256(mpzHash.get_mpz_t(), phash);
         
-        while ((phash < hashBlockHeaderLimit || (mpzHash % mpzHashFactor != 0)) && pblock->nNonce < 0xffff0000) {
+        while ((phash < hashBlockHeaderLimit || !mpz_divisible_p(mpzHash.get_mpz_t(), mpzHashFactor.get_mpz_t())) && pblock->nNonce < 0xffff0000) {
             pblock->nNonce++;
             phash = pblock->GetHeaderHash();
             mpz_set_uint256(mpzHash.get_mpz_t(), phash);
@@ -4645,6 +4645,8 @@ void static BitcoinMiner(CWallet *pwallet)
             if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
                 error("PrimecoinMiner() : primorial decrement overflow");
         }
+        // HACK: Fixed round primorial
+        nPrimorialMultiplier = 31;
         Primorial(nPrimorialMultiplier, mpzPrimorial);
 
         loop
@@ -4669,7 +4671,7 @@ void static BitcoinMiner(CWallet *pwallet)
 
             // Primecoin: mine for prime chain
             unsigned int nProbableChainLength;
-            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, nChainsHit, mpzHash))
+            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, nChainsHit, mpzHash, nPrimorialMultiplier))
             {
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
                 CheckWork(pblock, *pwalletMain, reservekey);
