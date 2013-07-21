@@ -4627,7 +4627,6 @@ void static BitcoinMiner(CWallet *pwallet)
         if (pblock->nNonce >= 0xffff0000)
             continue;
         // Primecoin: primorial fixed multiplier
-        mpz_class mpzPrimorial;
         unsigned int nRoundTests = 0;
         unsigned int nRoundPrimesHit = 0;
         int64 nPrimeTimerStart = GetTimeMicros();
@@ -4645,29 +4644,31 @@ void static BitcoinMiner(CWallet *pwallet)
             if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
                 error("PrimecoinMiner() : primorial decrement overflow");
         }
+        mpz_class mpzPrimorial;
         // HACK: Fixed round primorial
         nPrimorialMultiplier = 31;
         Primorial(nPrimorialMultiplier, mpzPrimorial);
+
+        // Primecoin: adjust round primorial so that the generated prime candidates meet the minimum
+        mpz_class mpzMultiplierMin = mpzPrimeMin * mpzHashFactor / mpzHash + 1;
+        while (mpzPrimorial < mpzMultiplierMin)
+        {
+            if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
+                error("PrimecoinMiner() : primorial minimum overflow");
+            Primorial(nPrimorialMultiplier, mpzPrimorial);
+        }
+        mpz_class mpzFixedMultiplier;
+        if (mpzPrimorial > mpzHashFactor) {
+            mpzFixedMultiplier = mpzPrimorial / mpzHashFactor;
+        } else {
+            mpzFixedMultiplier = 1;
+        }
 
         loop
         {
             unsigned int nTests = 0;
             unsigned int nPrimesHit = 0;
             unsigned int nChainsHit = 0;
-
-            mpz_class mpzMultiplierMin = mpzPrimeMin * mpzHashFactor / mpzHash + 1;
-            while (mpzPrimorial < mpzMultiplierMin)
-            {
-                if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
-                    error("PrimecoinMiner() : primorial minimum overflow");
-                Primorial(nPrimorialMultiplier, mpzPrimorial);
-            }
-            mpz_class mpzFixedMultiplier;
-            if (mpzPrimorial > mpzHashFactor) {
-                mpzFixedMultiplier = mpzPrimorial / mpzHashFactor;
-            } else {
-                mpzFixedMultiplier = 1;
-            }
 
             // Primecoin: mine for prime chain
             unsigned int nProbableChainLength;
