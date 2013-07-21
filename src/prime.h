@@ -198,7 +198,17 @@ public:
                 nCandidateMultiplier = 0;
                 return false;
             }
-            if (vfCandidates[GetWordNum(nCandidateMultiplier)] & GetBitMask(nCandidateMultiplier))
+            unsigned long lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
+            if (nCandidateMultiplier % nWordBits == 0)
+            {
+                if (lBits == 0)
+                {
+                    // Skip an entire word
+                    nCandidateMultiplier += nWordBits - 1;
+                    continue;
+                }
+            }
+            if (lBits & GetBitMask(nCandidateMultiplier))
             {
                 nVariableMultiplier = nCandidateMultiplier;
                 return true;
