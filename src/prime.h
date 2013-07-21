@@ -195,6 +195,7 @@ public:
     //   False - scan complete, no more candidate and reset scan
     bool GetNextCandidateMultiplier(unsigned int& nVariableMultiplier)
     {
+        unsigned long lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
         loop
         {
             nCandidateMultiplier++;
@@ -203,9 +204,9 @@ public:
                 nCandidateMultiplier = 0;
                 return false;
             }
-            unsigned long lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
             if (nCandidateMultiplier % nWordBits == 0)
             {
+                lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
                 if (lBits == 0)
                 {
                     // Skip an entire word
