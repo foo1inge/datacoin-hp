@@ -4654,8 +4654,6 @@ void static BitcoinMiner(CWallet *pwallet)
                 error("PrimecoinMiner() : primorial decrement overflow");
         }
         mpz_class mpzPrimorial;
-        // HACK: Fixed round primorial
-        nPrimorialMultiplier = 31;
         Primorial(nPrimorialMultiplier, mpzPrimorial);
 
         // Primecoin: adjust round primorial so that the generated prime candidates meet the minimum
