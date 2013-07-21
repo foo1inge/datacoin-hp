@@ -4612,17 +4612,30 @@ void static BitcoinMiner(CWallet *pwallet)
         // Primecoin: try to find hash divisible by primorial
         mpz_class mpzHashFactor;
         Primorial(nPrimorialHashFactor, mpzHashFactor);
-        
-        // mustyoshi's patch from https://bitcointalk.org/index.php?topic=251850.msg2689981#msg2689981
-        // with some gmp modifications
-        uint256 phash = pblock->GetHeaderHash();
+
+        // Based on mustyoshi's patch from https://bitcointalk.org/index.php?topic=251850.msg2689981#msg2689981
+        uint256 phash;
         mpz_class mpzHash;
-        mpz_set_uint256(mpzHash.get_mpz_t(), phash);
-        
-        while ((phash < hashBlockHeaderLimit || !mpz_divisible_p(mpzHash.get_mpz_t(), mpzHashFactor.get_mpz_t())) && pblock->nNonce < 0xffff0000) {
-            pblock->nNonce++;
+        loop {
+            if (pblock->nNonce >= 0xffff0000)
+                break;
+
+            // Check that the hash meets the minimum
             phash = pblock->GetHeaderHash();
+            if (phash < hashBlockHeaderLimit) {
+                pblock->nNonce++;
+                continue;
+            }
+
+            // Check that the hash is divisible by the fixed primorial
             mpz_set_uint256(mpzHash.get_mpz_t(), phash);
+            if (!mpz_divisible_p(mpzHash.get_mpz_t(), mpzHashFactor.get_mpz_t())) {
+                pblock->nNonce++;
+                continue;
+            }
+
+            // Use the hash that passed the tests
+            break;
         }
         if (pblock->nNonce >= 0xffff0000)
             continue;
