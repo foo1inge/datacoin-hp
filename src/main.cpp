@@ -70,6 +70,7 @@ CScript COINBASE_FLAGS;
 const string strMessageMagic = "Primecoin Signed Message:\n";
 
 double dPrimesPerSec = 0.0;
+double dChainsPerMinute = 0.0;
 int64 nHPSTimerStart = 0;
 
 // Settings
@@ -4724,7 +4725,7 @@ void static BitcoinMiner(CWallet *pwallet)
                         double dPrimesPerMinute = 60000.0 * nPrimeCounter / (nMillisNow - nHPSTimerStart);
                         dPrimesPerSec = dPrimesPerMinute / 60.0;
                         double dTestsPerMinute = 60000.0 * nTestCounter / (nMillisNow - nHPSTimerStart);
-                        double dChainsPerMinute = 60000.0 * nChainCounter / (nMillisNow - nHPSTimerStart);
+                        dChainsPerMinute = 60000.0 * nChainCounter / (nMillisNow - nHPSTimerStart);
                         nHPSTimerStart = nMillisNow;
                         nPrimeCounter = 0;
                         nTestCounter = 0;

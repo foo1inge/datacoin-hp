@@ -11,9 +11,14 @@
 #include <gmpxx.h>
 #include <bitset>
 
+static const unsigned int nMaxSievePercentage = 100;
+static const unsigned int nDefaultSievePercentage = 10;
+static const unsigned int nMinSievePercentage = 1;
+extern unsigned int nSievePercentage;
 static const unsigned int nMaxSieveSize = 10000000u;
 static const unsigned int nDefaultSieveSize = 1000000u;
 static const unsigned int nMinSieveSize = 100000u;
+extern unsigned int nSieveSize;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
 static const CBigNum bnOne = 1;
 static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;

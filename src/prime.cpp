@@ -7,14 +7,18 @@
 // Prime Table
 std::vector<unsigned int> vPrimes;
 std::vector<unsigned int> vTwoInverses;
-static unsigned int nSieveSize = nDefaultSieveSize;
+unsigned int nSieveSize = nDefaultSieveSize;
+unsigned int nSievePercentage = nDefaultSievePercentage;
 
 static unsigned int int_invert(unsigned int a, unsigned int nPrime);
 
 void GeneratePrimeTable()
 {
-    nSieveSize = (int)GetArg("-sievesize", nDefaultSieveSize);
+    nSievePercentage = (unsigned int)GetArg("-sievepercentage", nDefaultSievePercentage);
+    nSievePercentage = std::max(std::min(nSievePercentage, nMaxSievePercentage), nMinSievePercentage);
+    nSieveSize = (unsigned int)GetArg("-sievesize", nDefaultSieveSize);
     nSieveSize = std::max(std::min(nSieveSize, nMaxSieveSize), nMinSieveSize);
+    printf("GeneratePrimeTable() : setting nSievePercentage = %u, nSieveSize = %u\n", nSievePercentage, nSieveSize);
     const unsigned nPrimeTableLimit = nSieveSize;
     vPrimes.clear();
     // Generate prime table using sieve of Eratosthenes
@@ -913,9 +917,9 @@ bool CSieveOfEratosthenes::Weave()
     unsigned int nSieveSize = this->nSieveSize;
     const unsigned int nTotalPrimes = vPrimes.size();
 
-    // Process only 10% of the primes
+    // Process only a set percentage of the primes
     // Most composites are still found
-    const unsigned int nPrimes = (uint64)nTotalPrimes * 10 / 100;
+    const unsigned int nPrimes = (uint64)nTotalPrimes * nSievePercentage / 100;
 
     mpz_t mpzFixedFactor; // fixed factor to derive the chain
 
