@@ -48,7 +48,7 @@ void PrimorialAt(mpz_class& bn, mpz_class& mpzPrimorial);
 // Return value:
 //   true - Probable prime chain found (one of nChainLength meeting target)
 //   false - prime chain too short (none of nChainLength meeting target)
-bool ProbablePrimeChainTest(const mpz_class& mpzPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin, bool mining = false, unsigned int nPrimorialSeq = 0);
+bool ProbablePrimeChainTest(const CBigNum& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin);
 
 static const unsigned int nFractionalBits = 24;
 static const unsigned int TARGET_FRACTIONAL_MASK = (1u<<nFractionalBits) - 1;
@@ -79,7 +79,7 @@ enum // prime chain type
     PRIME_CHAIN_CUNNINGHAM2 = 2u,
     PRIME_CHAIN_BI_TWIN     = 3u,
 };
-bool CheckPrimeProofOfWork(uint256& hashBlockHeader, unsigned int nBits, const mpz_class& mpzPrimeChainMultiplier, unsigned int& nChainType, unsigned int& nChainLength);
+bool CheckPrimeProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CBigNum& bnPrimeChainMultiplier, unsigned int& nChainType, unsigned int& nChainLength);
 
 // prime target difficulty value for visualization
 double GetPrimeDifficulty(unsigned int nBits);

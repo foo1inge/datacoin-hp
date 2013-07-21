@@ -1122,10 +1122,7 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
 
 bool CheckProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CBigNum& bnProbablePrime, unsigned int& nChainType, unsigned int& nChainLength)
 {
-    char *strProbablePrime = BN_bn2hex(&bnProbablePrime);
-    mpz_class mpzProbablePrime(strProbablePrime, 16);
-    OPENSSL_free(strProbablePrime);
-    if (!CheckPrimeProofOfWork(hashBlockHeader, nBits, mpzProbablePrime, nChainType, nChainLength))
+    if (!CheckPrimeProofOfWork(hashBlockHeader, nBits, bnProbablePrime, nChainType, nChainLength))
         return error("CheckProofOfWork() : check failed for prime proof-of-work");
     return true;
 }
