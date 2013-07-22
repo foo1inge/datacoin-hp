@@ -4614,6 +4614,7 @@ void static BitcoinMiner(CWallet *pwallet)
         uint256 phash;
         mpz_class mpzHash;
         loop {
+            // Fast loop
             if (pblock->nNonce >= 0xffff0000)
                 break;
 
@@ -4637,46 +4638,32 @@ void static BitcoinMiner(CWallet *pwallet)
         if (pblock->nNonce >= 0xffff0000)
             continue;
         // Primecoin: primorial fixed multiplier
+        mpz_class mpzPrimorial;
         unsigned int nRoundTests = 0;
         unsigned int nRoundPrimesHit = 0;
         int64 nPrimeTimerStart = GetTimeMicros();
-        if (nTimeExpected > nTimeExpectedPrev)
-            fIncrementPrimorial = !fIncrementPrimorial;
-        nTimeExpectedPrev = nTimeExpected;
-        // Primecoin: dynamic adjustment of primorial multiplier
-        if (fIncrementPrimorial)
-        {
-            if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
-                error("PrimecoinMiner() : primorial increment overflow");
-        }
-        else if (nPrimorialMultiplier > nPrimorialHashFactor)
-        {
-            if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
-                error("PrimecoinMiner() : primorial decrement overflow");
-        }
-        mpz_class mpzPrimorial;
         Primorial(nPrimorialMultiplier, mpzPrimorial);
-
-        // Primecoin: adjust round primorial so that the generated prime candidates meet the minimum
-        mpz_class mpzMultiplierMin = mpzPrimeMin * nHashFactor / mpzHash + 1;
-        while (mpzPrimorial < mpzMultiplierMin)
-        {
-            if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
-                error("PrimecoinMiner() : primorial minimum overflow");
-            Primorial(nPrimorialMultiplier, mpzPrimorial);
-        }
-        mpz_class mpzFixedMultiplier;
-        if (mpzPrimorial > nHashFactor) {
-            mpzFixedMultiplier = mpzPrimorial / nHashFactor;
-        } else {
-            mpzFixedMultiplier = 1;
-        }
 
         loop
         {
             unsigned int nTests = 0;
             unsigned int nPrimesHit = 0;
             unsigned int nChainsHit = 0;
+
+            // Primecoin: adjust round primorial so that the generated prime candidates meet the minimum
+            mpz_class mpzMultiplierMin = mpzPrimeMin * nHashFactor / mpzHash + 1;
+            while (mpzPrimorial < mpzMultiplierMin)
+            {
+                if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
+                    error("PrimecoinMiner() : primorial minimum overflow");
+                Primorial(nPrimorialMultiplier, mpzPrimorial);
+            }
+            mpz_class mpzFixedMultiplier;
+            if (mpzPrimorial > nHashFactor) {
+                mpzFixedMultiplier = mpzPrimorial / nHashFactor;
+            } else {
+                mpzFixedMultiplier = 1;
+            }
 
             // Primecoin: mine for prime chain
             unsigned int nProbableChainLength;
@@ -4744,21 +4731,75 @@ void static BitcoinMiner(CWallet *pwallet)
             boost::this_thread::interruption_point();
             if (vNodes.empty())
                 break;
-            if (fNewBlock || pblock->nNonce >= 0xffff0000)
+            if (pblock->nNonce >= 0xffff0000)
                 break;
-            if (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+            if (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 10)
                 break;
             if (pindexPrev != pindexBest)
                 break;
+            if (fNewBlock)
+            {
+                // Primecoin: a sieve+primality round completes
+                // Primecoin: estimate time to block
+                int64 nRoundTime = (GetTimeMicros() - nPrimeTimerStart); 
+                nTimeExpected = nRoundTime / max(1u, nRoundTests);
+                nTimeExpected = nTimeExpected * max(1u, nRoundTests) / max(1u, nRoundPrimesHit);
+                for (unsigned int n = 1; n < TargetGetLength(pblock->nBits); n++)
+                    nTimeExpected = nTimeExpected * max(1u, nRoundTests) * 3 / max(1u, nRoundPrimesHit);
+                if (fDebug && GetBoolArg("-printmining"))
+                    printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus expect=%us\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, (unsigned int)(nTimeExpected/1000000));
+
+                // Primecoin: update time and nonce
+                pblock->nTime = max(pblock->nTime, (unsigned int) GetAdjustedTime());
+                pblock->nNonce++;
+                loop {
+                    // Fast loop
+                    if (pblock->nNonce >= 0xffff0000)
+                        break;
+
+                    // Check that the hash meets the minimum
+                    phash = pblock->GetHeaderHash();
+                    if (phash < hashBlockHeaderLimit) {
+                        pblock->nNonce++;
+                        continue;
+                    }
+
+                    // Check that the hash is divisible by the fixed primorial
+                    mpz_set_uint256(mpzHash.get_mpz_t(), phash);
+                    if (!mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) {
+                        pblock->nNonce++;
+                        continue;
+                    }
+
+                    // Use the hash that passed the tests
+                    break;
+                }
+                if (pblock->nNonce >= 0xffff0000)
+                    break;
+
+                // Primecoin: reset sieve+primality round timer
+                nRoundTests = 0;
+                nRoundPrimesHit = 0;
+                nPrimeTimerStart = GetTimeMicros();
+                if (nTimeExpected > nTimeExpectedPrev)
+                    fIncrementPrimorial = !fIncrementPrimorial;
+                nTimeExpectedPrev = nTimeExpected;
+
+                // Primecoin: dynamic adjustment of primorial multiplier
+                if (fIncrementPrimorial)
+                {
+                    if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
+                        error("PrimecoinMiner() : primorial increment overflow");
+                }
+                else if (nPrimorialMultiplier > nPrimorialHashFactor)
+                {
+                    if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
+                        error("PrimecoinMiner() : primorial decrement overflow");
+                }
+                Primorial(nPrimorialMultiplier, mpzPrimorial);
+            }
         }
 
-        // Primecoin: estimate time to block
-        nTimeExpected = (GetTimeMicros() - nPrimeTimerStart) / max(1u, nRoundTests);
-        nTimeExpected = nTimeExpected * max(1u, nRoundTests) / max(1u, nRoundPrimesHit);
-        for (unsigned int n = 1; n < TargetGetLength(pblock->nBits); n++)
-             nTimeExpected = nTimeExpected * max(1u, nRoundTests) * 3 / max(1u, nRoundPrimesHit);
-        if (fDebug && GetBoolArg("-printmining"))
-            printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u expected=%us\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int)(nTimeExpected/1000000));
     } }
     catch (boost::thread_interrupted)
     {
