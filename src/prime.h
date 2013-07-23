@@ -96,6 +96,10 @@ unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned i
 // prime chain type and length value
 std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength);
 
+#if defined(__i386__) || defined(_M_IX86) || defined(_X86_) || defined(__x86_64__) || defined(_M_X64)
+#define USE_ROTATE
+#endif
+
 // Sieve of Eratosthenes for proof-of-work mining
 class CSieveOfEratosthenes
 {
@@ -131,14 +135,32 @@ class CSieveOfEratosthenes
 
     void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const unsigned int nPrime, unsigned int *vMultipliers)
     {
+#ifdef USE_ROTATE
+        const unsigned int nRotateBits = nPrime % nWordBits;
+        for (unsigned int i = 0; i < nHalfChainLength; i++)
+        {
+            unsigned int nVariableMultiplier = vMultipliers[i];
+            if (nVariableMultiplier == 0xFFFFFFFF) break;
+            unsigned long lBitMask = GetBitMask(nVariableMultiplier);
+            for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+            {
+                vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
+                lBitMask = (lBitMask << nRotateBits) | (lBitMask >> (nWordBits - nRotateBits));
+            }
+            vMultipliers[i] = nVariableMultiplier;
+        }
+#else
         for (unsigned int i = 0; i < nHalfChainLength; i++)
         {
             unsigned int nVariableMultiplier = vMultipliers[i];
             if (nVariableMultiplier == 0xFFFFFFFF) break;
             for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+            {
                 vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
+            }
             vMultipliers[i] = nVariableMultiplier;
         }
+#endif
     }
 
 public:
