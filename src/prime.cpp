@@ -779,7 +779,7 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
         unsigned long lDivisor = 1;
         unsigned int i;
         testParams.vFastDivSeq.push_back(nPrimorialSeq);
-        for (i = 0; i < nFastDivPrimes; i++)
+        for (i = 1; i <= nFastDivPrimes; i++)
         {
             // Multiply primes together until the result won't fit an unsigned long
             if (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
