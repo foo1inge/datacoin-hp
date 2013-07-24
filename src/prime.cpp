@@ -3,6 +3,7 @@
 // see the accompanying file COPYING
 
 #include "prime.h"
+#include <climits>
 
 // Prime Table
 std::vector<unsigned int> vPrimes;
@@ -478,7 +479,7 @@ bool CheckPrimeProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CB
 //
 
 // Number of primes to test with fast divisibility testing
-static const unsigned int nFastDivPrimes = 30;
+static const unsigned int nFastDivPrimes = 50;
 
 class CPrimalityTestParams
 {
@@ -493,6 +494,11 @@ public:
     mpz_class mpzOriginMinusOne;
     mpz_class mpzOriginPlusOne;
     mpz_class N;
+
+    // Big divisors for fast div test
+    std::vector<unsigned long> vFastDivisors;
+    std::vector<unsigned int> vFastDivSeq;
+    unsigned int nFastDivisorsSize;
 
     // Values specific to a round
     unsigned int nBits;
@@ -537,18 +543,23 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
     mpz_t& mpzN = testParams.mpzN;
     mpz_t& mpzE = testParams.mpzE;
     mpz_t& mpzR = testParams.mpzR;
-    const unsigned int nPrimorialSeq = testParams.nPrimorialSeq;
 
     mpz_set(mpzN, n.get_mpz_t());
     if (fFastDiv)
     {
         // Fast divisibility tests
-        // Starting from the first prime not included in the round primorial
-        const unsigned int nBeginSeq = nPrimorialSeq + 1;
-        const unsigned int nEndSeq = nBeginSeq + nFastDivPrimes;
-        for (unsigned int nPrimeSeq = nBeginSeq; nPrimeSeq < nEndSeq; nPrimeSeq++) {
-            if (mpz_divisible_ui_p(mpzN, vPrimes[nPrimeSeq])) {
-                return false;
+        // Divide n by a large divisor
+        // Use the remainder to test divisibility by small primes
+        const unsigned int nDivSize = testParams.nFastDivisorsSize;
+        for (unsigned int i = 0; i < nDivSize; i++)
+        {
+            unsigned long lRemainder = mpz_tdiv_ui(mpzN, testParams.vFastDivisors[i]);
+            unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
+            const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
+            for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
+            {
+                if (lRemainder % vPrimes[nPrimeSeq] == 0)
+                    return false;
             }
         }
     }
@@ -584,18 +595,23 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
     mpz_t& mpzE = testParams.mpzE;
     mpz_t& mpzR = testParams.mpzR;
     mpz_t& mpzRplusOne = testParams.mpzRplusOne;
-    const unsigned int nPrimorialSeq = testParams.nPrimorialSeq;
 
     mpz_set(mpzN, n.get_mpz_t());
     if (fFastDiv)
     {
         // Fast divisibility tests
-        // Starting from the first prime not included in the round primorial
-        const unsigned int nBeginSeq = nPrimorialSeq + 1;
-        const unsigned int nEndSeq = nBeginSeq + nFastDivPrimes;
-        for (unsigned int nPrimeSeq = nBeginSeq; nPrimeSeq < nEndSeq; nPrimeSeq++) {
-            if (mpz_divisible_ui_p(mpzN, vPrimes[nPrimeSeq])) {
-                return false;
+        // Divide n by a large divisor
+        // Use the remainder to test divisibility by small primes
+        const unsigned int nDivSize = testParams.nFastDivisorsSize;
+        for (unsigned int i = 0; i < nDivSize; i++)
+        {
+            unsigned long lRemainder = mpz_tdiv_ui(mpzN, testParams.vFastDivisors[i]);
+            unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
+            const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
+            for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
+            {
+                if (lRemainder % vPrimes[nPrimeSeq] == 0)
+                    return false;
             }
         }
     }
@@ -757,6 +773,35 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
 
     // Allocate GMP variables for primality tests
     CPrimalityTestParams testParams(nBits, nPrimorialSeq);
+
+    // Compute parameters for fast div test
+    {
+        unsigned long lDivisor = 1;
+        unsigned int i;
+        testParams.vFastDivSeq.push_back(nPrimorialSeq);
+        for (i = 0; i < nFastDivPrimes; i++)
+        {
+            // Multiply primes together until the result won't fit an unsigned long
+            if (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
+                lDivisor *= vPrimes[nPrimorialSeq + i];
+            else
+            {
+                testParams.vFastDivisors.push_back(lDivisor);
+                testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
+                lDivisor = 1;
+            }
+        }
+
+        // Finish off by multiplying as many primes as possible
+        while (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
+        {
+            lDivisor *= vPrimes[nPrimorialSeq + i];
+            i++;
+        }
+        testParams.vFastDivisors.push_back(lDivisor);
+        testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
+        testParams.nFastDivisorsSize = testParams.vFastDivisors.size();
+    }
 
     nStart = GetTimeMicros();
     
