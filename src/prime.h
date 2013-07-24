@@ -137,6 +137,9 @@ class CSieveOfEratosthenes
 
     void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const std::vector<unsigned int>& vPrimes, unsigned int *vMultipliers)
     {
+        // Wipe the part of the array first
+        memset(vfComposites + GetWordNum(nMinMultiplier), 0, (nMaxMultiplier - nMinMultiplier + nWordBits - 1) / nWordBits);
+
         for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
         {
             const unsigned int nPrime = vPrimes[nPrimeSeq];

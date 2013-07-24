@@ -981,11 +981,6 @@ bool CSieveOfEratosthenes::Weave()
     unsigned long *vfCompositeCunningham2A = (unsigned long *)malloc(nCandidatesBytes);
     unsigned long *vfCompositeCunningham2B = (unsigned long *)malloc(nCandidatesBytes);
 
-    memset(vfCompositeCunningham1A, 0, nCandidatesBytes);
-    memset(vfCompositeCunningham1B, 0, nCandidatesBytes);
-    memset(vfCompositeCunningham2A, 0, nCandidatesBytes);
-    memset(vfCompositeCunningham2B, 0, nCandidatesBytes);
-
     unsigned long *vfCandidates = this->vfCandidates;
 
     // Check whether fixed multiplier fits in an unsigned long
