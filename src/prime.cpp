@@ -485,7 +485,6 @@ class CPrimalityTestParams
 {
 public:
     // GMP variables
-    mpz_t mpzN;
     mpz_t mpzE;
     mpz_t mpzR;
     mpz_t mpzRplusOne;
@@ -519,7 +518,6 @@ public:
         nChainLengthCunningham1 = 0;
         nChainLengthCunningham2 = 0;
         nChainLengthBiTwin = 0;
-        mpz_init(mpzN);
         mpz_init(mpzE);
         mpz_init(mpzR);
         mpz_init(mpzRplusOne);
@@ -527,7 +525,6 @@ public:
 
     ~CPrimalityTestParams()
     {
-        mpz_clear(mpzN);
         mpz_clear(mpzE);
         mpz_clear(mpzR);
         mpz_clear(mpzRplusOne);
@@ -540,11 +537,9 @@ public:
 static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastDiv = false, bool fFastFail = false)
 {
     // Faster GMP version
-    mpz_t& mpzN = testParams.mpzN;
     mpz_t& mpzE = testParams.mpzE;
     mpz_t& mpzR = testParams.mpzR;
 
-    mpz_set(mpzN, n.get_mpz_t());
     if (fFastDiv)
     {
         // Fast divisibility tests
@@ -553,7 +548,7 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
         const unsigned int nDivSize = testParams.nFastDivisorsSize;
         for (unsigned int i = 0; i < nDivSize; i++)
         {
-            unsigned long lRemainder = mpz_tdiv_ui(mpzN, testParams.vFastDivisors[i]);
+            unsigned long lRemainder = mpz_tdiv_ui(n.get_mpz_t(), testParams.vFastDivisors[i]);
             unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
             const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
             for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
@@ -564,16 +559,16 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
         }
     }
 
-    mpz_sub_ui(mpzE, mpzN, 1);
-    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, mpzN);
+    mpz_sub_ui(mpzE, n.get_mpz_t(), 1);
+    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, n.get_mpz_t());
     if (mpz_cmp_ui(mpzR, 1) == 0)
         return true;
     if (fFastFail)
         return false;
     // Failed Fermat test, calculate fractional length
-    mpz_sub(mpzE, mpzN, mpzR);
+    mpz_sub(mpzE, n.get_mpz_t(), mpzR);
     mpz_mul_2exp(mpzR, mpzE, nFractionalBits);
-    mpz_tdiv_q(mpzE, mpzR, mpzN);
+    mpz_tdiv_q(mpzE, mpzR, n.get_mpz_t());
     unsigned int nFractionalLength = mpz_get_ui(mpzE);
     if (nFractionalLength >= (1 << nFractionalBits))
         return error("FermatProbablePrimalityTest() : fractional assert");
@@ -591,12 +586,10 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
 static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSophieGermain, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastDiv = false)
 {
     // Faster GMP version
-    mpz_t& mpzN = testParams.mpzN;
     mpz_t& mpzE = testParams.mpzE;
     mpz_t& mpzR = testParams.mpzR;
     mpz_t& mpzRplusOne = testParams.mpzRplusOne;
 
-    mpz_set(mpzN, n.get_mpz_t());
     if (fFastDiv)
     {
         // Fast divisibility tests
@@ -605,7 +598,7 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
         const unsigned int nDivSize = testParams.nFastDivisorsSize;
         for (unsigned int i = 0; i < nDivSize; i++)
         {
-            unsigned long lRemainder = mpz_tdiv_ui(mpzN, testParams.vFastDivisors[i]);
+            unsigned long lRemainder = mpz_tdiv_ui(n.get_mpz_t(), testParams.vFastDivisors[i]);
             unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
             const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
             for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
@@ -615,22 +608,22 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
             }
         }
     }
-    mpz_sub_ui(mpzE, mpzN, 1);
+    mpz_sub_ui(mpzE, n.get_mpz_t(), 1);
     mpz_tdiv_q_2exp(mpzE, mpzE, 1);
-    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, mpzN);
-    unsigned int nMod8 = mpz_get_ui(mpzN) % 8;
+    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, n.get_mpz_t());
+    unsigned int nMod8 = mpz_get_ui(n.get_mpz_t()) % 8;
     bool fPassedTest = false;
     if (fSophieGermain && (nMod8 == 7)) // Euler & Lagrange
         fPassedTest = !mpz_cmp_ui(mpzR, 1);
     else if (fSophieGermain && (nMod8 == 3)) // Lifchitz
     {
         mpz_add_ui(mpzRplusOne, mpzR, 1);
-        fPassedTest = !mpz_cmp(mpzRplusOne, mpzN);
+        fPassedTest = !mpz_cmp(mpzRplusOne, n.get_mpz_t());
     }
     else if ((!fSophieGermain) && (nMod8 == 5)) // Lifchitz
     {
         mpz_add_ui(mpzRplusOne, mpzR, 1);
-        fPassedTest = !mpz_cmp(mpzRplusOne, mpzN);
+        fPassedTest = !mpz_cmp(mpzRplusOne, n.get_mpz_t());
     }
     else if ((!fSophieGermain) && (nMod8 == 1)) // LifChitz
         fPassedTest = !mpz_cmp_ui(mpzR, 1);
@@ -644,11 +637,11 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
     
     // Failed test, calculate fractional length
     mpz_mul(mpzE, mpzR, mpzR);
-    mpz_tdiv_r(mpzR, mpzE, mpzN); // derive Fermat test remainder
+    mpz_tdiv_r(mpzR, mpzE, n.get_mpz_t()); // derive Fermat test remainder
 
-    mpz_sub(mpzE, mpzN, mpzR);
+    mpz_sub(mpzE, n.get_mpz_t(), mpzR);
     mpz_mul_2exp(mpzR, mpzE, nFractionalBits);
-    mpz_tdiv_q(mpzE, mpzR, mpzN);
+    mpz_tdiv_q(mpzE, mpzR, n.get_mpz_t());
     unsigned int nFractionalLength = mpz_get_ui(mpzE);
     
     if (nFractionalLength >= (1 << nFractionalBits))
@@ -667,14 +660,14 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
 static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams)
 {
     nProbableChainLength = 0;
-    mpz_class &N = testParams.N;
-    N = n;
 
     // Fermat test for n first
-    if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams, true, true))
+    if (!FermatProbablePrimalityTestFast(n, nProbableChainLength, testParams, true, true))
         return false;
 
     // Euler-Lagrange-Lifchitz test for the following numbers in chain
+    mpz_class &N = testParams.N;
+    N = n;
     while (true)
     {
         TargetIncrementLength(nProbableChainLength);
