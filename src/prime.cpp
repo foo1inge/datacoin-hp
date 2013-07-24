@@ -479,7 +479,7 @@ bool CheckPrimeProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CB
 //
 
 // Number of primes to test with fast divisibility testing
-static const unsigned int nFastDivPrimes = 50;
+static const unsigned int nFastDivPrimes = 60;
 
 class CPrimalityTestParams
 {
