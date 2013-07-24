@@ -995,20 +995,34 @@ bool CSieveOfEratosthenes::Weave()
     else
         mpzFixedFactor = mpzHash * mpzFixedMultiplier;
 
+    unsigned int nCombinedEndSeq = 1;
+    unsigned int nFixedFactorCombinedMod = 0;
+
     for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
     {
         if (pindexPrev != pindexBest)
             break;  // new block
         unsigned int nPrime = vPrimes[nPrimeSeq];
-        unsigned int nFixedFactorMod;
-        if (fUseLongForFixedMultiplier)
+        if (nPrimeSeq >= nCombinedEndSeq)
         {
-            nFixedFactorMod = mpz_tdiv_ui(mpzHash.get_mpz_t(), nPrime);
-            nFixedFactorMod = (uint64)nFixedFactorMod * (nFixedMultiplier % nPrime) % nPrime;
-        }
-        else
-            nFixedFactorMod = mpz_tdiv_ui(mpzFixedFactor.get_mpz_t(), nPrime);
+            // Combine multiple primes to produce a big divisor
+            unsigned int nPrimeCombined = 1;
+            while (nPrimeCombined < UINT_MAX / vPrimes[nCombinedEndSeq])
+            {
+                nPrimeCombined *= vPrimes[nCombinedEndSeq];
+                nCombinedEndSeq++;
+            }
 
+            if (fUseLongForFixedMultiplier)
+            {
+                nFixedFactorCombinedMod = mpz_tdiv_ui(mpzHash.get_mpz_t(), nPrimeCombined);
+                nFixedFactorCombinedMod = (uint64)nFixedFactorCombinedMod * (nFixedMultiplier % nPrimeCombined) % nPrimeCombined;
+            }
+            else
+                nFixedFactorCombinedMod = mpz_tdiv_ui(mpzFixedFactor.get_mpz_t(), nPrimeCombined);
+        }
+
+        unsigned int nFixedFactorMod = nFixedFactorCombinedMod % nPrime;
         if (nFixedFactorMod == 0)
         {
             // Nothing in the sieve is divisible by this prime
