@@ -531,7 +531,7 @@ public:
 // Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
 // true: n is probable prime
 // false: n is composite; set fractional length in the nLength output
-static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastDiv = false)
+static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastDiv = false, bool fFastFail = false)
 {
     // Faster GMP version
     mpz_t& mpzN = testParams.mpzN;
@@ -556,9 +556,9 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
     mpz_sub_ui(mpzE, mpzN, 1);
     mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, mpzN);
     if (mpz_cmp_ui(mpzR, 1) == 0)
-    {
         return true;
-    }
+    if (fFastFail)
+        return false;
     // Failed Fermat test, calculate fractional length
     mpz_sub(mpzE, mpzN, mpzR);
     mpz_mul_2exp(mpzR, mpzE, nFractionalBits);
@@ -655,7 +655,7 @@ static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGerm
     N = n;
 
     // Fermat test for n first
-    if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams, true))
+    if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams, true, true))
         return false;
 
     // Euler-Lagrange-Lifchitz test for the following numbers in chain
