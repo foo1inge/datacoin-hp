@@ -752,6 +752,7 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
         if (fDebug && GetBoolArg("-printmining"))
             printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", lpsieve->GetCandidateCount(), nSieveSize, lpsieve->GetProgressPercentage(), (unsigned int) (GetTimeMicros() - nStart));
         psieve.reset(lpsieve);
+        return false; // sieve generation takes time so return now
     }
 
     mpz_class mpzHashMultiplier = mpzHash * mpzFixedMultiplier;
