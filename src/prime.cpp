@@ -757,9 +757,6 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
     mpz_class mpzHashMultiplier = mpzHash * mpzFixedMultiplier;
     mpz_class mpzChainOrigin;
     
-    // Count the number of candidates produced by the sieve
-    unsigned int nCandidates = lpsieve->GetCandidateCount();
-    
     // Determine the sequence number of the round primorial
     unsigned int nPrimorialSeq = 0;
     while (vPrimes[nPrimorialSeq + 1] <= nPrimorialMultiplier)
@@ -803,9 +800,12 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
     unsigned int& nChainLengthCunningham1 = testParams.nChainLengthCunningham1;
     unsigned int& nChainLengthCunningham2 = testParams.nChainLengthCunningham2;
     unsigned int& nChainLengthBiTwin = testParams.nChainLengthBiTwin;
+    
+    // Number of candidates to be tested during a single call to this function
+    const unsigned int nTestsAtOnce = 500;
 
-    // Process the sieve in 10 parts
-    while (nTests < (nCandidates + 9) / 10 && pindexPrev == pindexBest)
+    // Process a part of the candidates
+    while (nTests < nTestsAtOnce && pindexPrev == pindexBest)
     {
         nTests++;
         if (!lpsieve->GetNextCandidateMultiplier(nTriedMultiplier))
