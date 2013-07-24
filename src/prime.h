@@ -105,7 +105,8 @@ class CSieveOfEratosthenes
 {
     unsigned int nSieveSize; // size of the sieve
     unsigned int nBits; // target of the prime chain to search for
-    mpz_class mpzFixedFactor; // fixed factor to derive the chain
+    mpz_class mpzHash; // hash of the block header
+    mpz_class mpzFixedMultiplier; // fixed round multiplier
 
     // final set of candidates for probable primality checking
     unsigned long *vfCandidates;
@@ -168,7 +169,8 @@ public:
     {
         this->nSieveSize = nSieveSize;
         this->nBits = nBits;
-        this->mpzFixedFactor = mpzFixedMultiplier * mpzHash;
+        this->mpzHash = mpzHash;
+        this->mpzFixedMultiplier = mpzFixedMultiplier;
         this->pindexPrev = pindexPrev;
         nPrimeSeq = 0;
         nCandidateCount = 0;

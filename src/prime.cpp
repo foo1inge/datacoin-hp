@@ -956,19 +956,17 @@ bool CSieveOfEratosthenes::Weave()
     CBlockIndex* pindexPrev = this->pindexPrev;
     unsigned int nSieveSize = this->nSieveSize;
     const unsigned int nTotalPrimes = vPrimes.size();
+    mpz_class mpzHash = this->mpzHash;
+    mpz_class mpzFixedMultiplier = this->mpzFixedMultiplier;
 
     // Process only a set percentage of the primes
     // Most composites are still found
     const unsigned int nPrimes = (uint64)nTotalPrimes * nSievePercentage / 100;
 
-    mpz_t mpzFixedFactor; // fixed factor to derive the chain
-
     unsigned int vCunningham1AMultipliers[nPrimes][nHalfChainLength];
     unsigned int vCunningham1BMultipliers[nPrimes][nHalfChainLength];
     unsigned int vCunningham2AMultipliers[nPrimes][nHalfChainLength];
     unsigned int vCunningham2BMultipliers[nPrimes][nHalfChainLength];
-
-    mpz_init_set(mpzFixedFactor, this->mpzFixedFactor.get_mpz_t());
 
     memset(vCunningham1AMultipliers, 0xFF, sizeof(vCunningham1AMultipliers));
     memset(vCunningham1BMultipliers, 0xFF, sizeof(vCunningham1BMultipliers));
@@ -988,12 +986,29 @@ bool CSieveOfEratosthenes::Weave()
 
     unsigned long *vfCandidates = this->vfCandidates;
 
+    // Check whether fixed multiplier fits in an unsigned long
+    bool fUseLongForFixedMultiplier = mpzFixedMultiplier < ULONG_MAX;
+    unsigned long nFixedMultiplier;
+    mpz_class mpzFixedFactor;
+    if (fUseLongForFixedMultiplier)
+        nFixedMultiplier = mpzFixedMultiplier.get_ui();
+    else
+        mpzFixedFactor = mpzHash * mpzFixedMultiplier;
+
     for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
     {
         if (pindexPrev != pindexBest)
             break;  // new block
         unsigned int nPrime = vPrimes[nPrimeSeq];
-        unsigned int nFixedFactorMod = mpz_tdiv_ui(mpzFixedFactor, nPrime);
+        unsigned int nFixedFactorMod;
+        if (fUseLongForFixedMultiplier)
+        {
+            nFixedFactorMod = mpz_tdiv_ui(mpzHash.get_mpz_t(), nPrime);
+            nFixedFactorMod = (uint64)nFixedFactorMod * (nFixedMultiplier % nPrime) % nPrime;
+        }
+        else
+            nFixedFactorMod = mpz_tdiv_ui(mpzFixedFactor.get_mpz_t(), nPrime);
+
         if (nFixedFactorMod == 0)
         {
             // Nothing in the sieve is divisible by this prime
@@ -1094,7 +1109,6 @@ bool CSieveOfEratosthenes::Weave()
     free(vfCompositeCunningham1B);
     free(vfCompositeCunningham2A);
     free(vfCompositeCunningham2B);
-    mpz_clear(mpzFixedFactor);
 
     return false;
 }
