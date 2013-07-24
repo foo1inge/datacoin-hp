@@ -678,7 +678,8 @@ static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGerm
     while (true)
     {
         TargetIncrementLength(nProbableChainLength);
-        N = N + N + (fSophieGermain? 1 : (-1));
+        N <<= 1;
+        N += (fSophieGermain? 1 : (-1));
         if (fFermatTest)
         {
             if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams, true))
