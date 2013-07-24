@@ -618,7 +618,7 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
     mpz_sub_ui(mpzE, mpzN, 1);
     mpz_tdiv_q_2exp(mpzE, mpzE, 1);
     mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, mpzN);
-    unsigned int nMod8 = mpz_tdiv_ui(mpzN, 8);
+    unsigned int nMod8 = mpz_get_ui(mpzN) % 8;
     bool fPassedTest = false;
     if (fSophieGermain && (nMod8 == 7)) // Euler & Lagrange
         fPassedTest = !mpz_cmp_ui(mpzR, 1);
