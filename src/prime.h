@@ -121,6 +121,7 @@ class CSieveOfEratosthenes
     
     unsigned int nChainLength;
     unsigned int nHalfChainLength;
+    unsigned int nPrimes;
     
     CBlockIndex* pindexPrev;
     
@@ -132,36 +133,40 @@ class CSieveOfEratosthenes
         return 1UL << (nBitNum % nWordBits);
     }
     
-    void AddMultiplier(unsigned int *vMultipliers, const unsigned int nSolvedMultiplier);
+    void AddMultiplier(unsigned int *vMultipliers, const unsigned int nPrimeSeq, const unsigned int nSolvedMultiplier);
 
-    void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const unsigned int nPrime, unsigned int *vMultipliers)
+    void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const std::vector<unsigned int>& vPrimes, unsigned int *vMultipliers)
     {
+        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+        {
+            const unsigned int nPrime = vPrimes[nPrimeSeq];
 #ifdef USE_ROTATE
-        const unsigned int nRotateBits = nPrime % nWordBits;
-        for (unsigned int i = 0; i < nHalfChainLength; i++)
-        {
-            unsigned int nVariableMultiplier = vMultipliers[i];
-            if (nVariableMultiplier == 0xFFFFFFFF) break;
-            unsigned long lBitMask = GetBitMask(nVariableMultiplier);
-            for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+            const unsigned int nRotateBits = nPrime % nWordBits;
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
             {
-                vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
-                lBitMask = (lBitMask << nRotateBits) | (lBitMask >> (nWordBits - nRotateBits));
+                unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
+                unsigned long lBitMask = GetBitMask(nVariableMultiplier);
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                {
+                    vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
+                    lBitMask = (lBitMask << nRotateBits) | (lBitMask >> (nWordBits - nRotateBits));
+                }
+                vMultipliers[nPrimeSeq * nHalfChainLength + i] = nVariableMultiplier;
             }
-            vMultipliers[i] = nVariableMultiplier;
-        }
 #else
-        for (unsigned int i = 0; i < nHalfChainLength; i++)
-        {
-            unsigned int nVariableMultiplier = vMultipliers[i];
-            if (nVariableMultiplier == 0xFFFFFFFF) break;
-            for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
             {
-                vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
+                unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                {
+                    vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
+                }
+                vMultipliers[nPrimeSeq * nHalfChainLength + i] = nVariableMultiplier;
             }
-            vMultipliers[i] = nVariableMultiplier;
-        }
 #endif
+        }
     }
 
 public:

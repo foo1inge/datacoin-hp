@@ -926,15 +926,15 @@ static unsigned int int_invert(unsigned int a, unsigned int nPrime)
     return (inverse + nPrime) % nPrime;
 }
 
-void CSieveOfEratosthenes::AddMultiplier(unsigned int *vMultipliers, const unsigned int nSolvedMultiplier)
+void CSieveOfEratosthenes::AddMultiplier(unsigned int *vMultipliers, const unsigned int nPrimeSeq, const unsigned int nSolvedMultiplier)
 {
     // Eliminate duplicates
     for (unsigned int i = 0; i < nHalfChainLength; i++)
     {
-        unsigned int nStoredMultiplier = vMultipliers[i];
+        unsigned int nStoredMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
         if (nStoredMultiplier == 0xFFFFFFFF || nStoredMultiplier == nSolvedMultiplier)
         {
-            vMultipliers[i] = nSolvedMultiplier;
+            vMultipliers[nPrimeSeq * nHalfChainLength + i] = nSolvedMultiplier;
             break;
         }
     }
@@ -962,16 +962,18 @@ bool CSieveOfEratosthenes::Weave()
     // Process only a set percentage of the primes
     // Most composites are still found
     const unsigned int nPrimes = (uint64)nTotalPrimes * nSievePercentage / 100;
+    this->nPrimes = nPrimes;
 
-    unsigned int vCunningham1AMultipliers[nPrimes][nHalfChainLength];
-    unsigned int vCunningham1BMultipliers[nPrimes][nHalfChainLength];
-    unsigned int vCunningham2AMultipliers[nPrimes][nHalfChainLength];
-    unsigned int vCunningham2BMultipliers[nPrimes][nHalfChainLength];
+    const unsigned int nMultiplierBytes = nPrimes * nHalfChainLength * sizeof(unsigned int);
+    unsigned int *vCunningham1AMultipliers = (unsigned int *)malloc(nMultiplierBytes);
+    unsigned int *vCunningham1BMultipliers = (unsigned int *)malloc(nMultiplierBytes);
+    unsigned int *vCunningham2AMultipliers = (unsigned int *)malloc(nMultiplierBytes);
+    unsigned int *vCunningham2BMultipliers = (unsigned int *)malloc(nMultiplierBytes);
 
-    memset(vCunningham1AMultipliers, 0xFF, sizeof(vCunningham1AMultipliers));
-    memset(vCunningham1BMultipliers, 0xFF, sizeof(vCunningham1BMultipliers));
-    memset(vCunningham2AMultipliers, 0xFF, sizeof(vCunningham2AMultipliers));
-    memset(vCunningham2BMultipliers, 0xFF, sizeof(vCunningham2BMultipliers));
+    memset(vCunningham1AMultipliers, 0xFF, nMultiplierBytes);
+    memset(vCunningham1BMultipliers, 0xFF, nMultiplierBytes);
+    memset(vCunningham2AMultipliers, 0xFF, nMultiplierBytes);
+    memset(vCunningham2BMultipliers, 0xFF, nMultiplierBytes);
 
     // bitsets that can be combined to obtain the final bitset of candidates
     unsigned long *vfCompositeCunningham1A = (unsigned long *)malloc(nCandidatesBytes);
@@ -1046,14 +1048,14 @@ bool CSieveOfEratosthenes::Weave()
             if (nBiTwinSeq < nChainLength)
             {
                 if (((nBiTwinSeq & 1u) == 0))
-                    AddMultiplier(vCunningham1AMultipliers[nPrimeSeq], nSolvedMultiplier);
+                    AddMultiplier(vCunningham1AMultipliers, nPrimeSeq, nSolvedMultiplier);
                 else
-                    AddMultiplier(vCunningham2AMultipliers[nPrimeSeq], nSolvedMultiplier);
+                    AddMultiplier(vCunningham2AMultipliers, nPrimeSeq, nSolvedMultiplier);
             } else {
                 if (((nBiTwinSeq & 1u) == 0))
-                    AddMultiplier(vCunningham1BMultipliers[nPrimeSeq], nSolvedMultiplier);
+                    AddMultiplier(vCunningham1BMultipliers, nPrimeSeq, nSolvedMultiplier);
                 else
-                    AddMultiplier(vCunningham2BMultipliers[nPrimeSeq], nSolvedMultiplier);
+                    AddMultiplier(vCunningham2BMultipliers, nPrimeSeq, nSolvedMultiplier);
             }
         }
     }
@@ -1070,29 +1072,10 @@ bool CSieveOfEratosthenes::Weave()
         if (pindexPrev != pindexBest)
             break;  // new block
 
-        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
-        {
-            unsigned int nPrime = vPrimes[nPrimeSeq];
-            ProcessMultiplier(vfCompositeCunningham1A, nMinMultiplier, nMaxMultiplier, nPrime, vCunningham1AMultipliers[nPrimeSeq]);
-        }
-
-        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
-        {
-            unsigned int nPrime = vPrimes[nPrimeSeq];
-            ProcessMultiplier(vfCompositeCunningham1B, nMinMultiplier, nMaxMultiplier, nPrime, vCunningham1BMultipliers[nPrimeSeq]);
-        }
-
-        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
-        {
-            unsigned int nPrime = vPrimes[nPrimeSeq];
-            ProcessMultiplier(vfCompositeCunningham2A, nMinMultiplier, nMaxMultiplier, nPrime, vCunningham2AMultipliers[nPrimeSeq]);
-        }
-
-        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
-        {
-            unsigned int nPrime = vPrimes[nPrimeSeq];
-            ProcessMultiplier(vfCompositeCunningham2B, nMinMultiplier, nMaxMultiplier, nPrime, vCunningham2BMultipliers[nPrimeSeq]);
-        }
+        ProcessMultiplier(vfCompositeCunningham1A, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham1AMultipliers);
+        ProcessMultiplier(vfCompositeCunningham1B, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham1BMultipliers);
+        ProcessMultiplier(vfCompositeCunningham2A, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham2AMultipliers);
+        ProcessMultiplier(vfCompositeCunningham2B, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham2BMultipliers);
 
         // Combine all the bitsets
         // vfCompositeCunningham1 = vfCompositeCunningham1A | vfCompositeCunningham1B
@@ -1123,6 +1106,11 @@ bool CSieveOfEratosthenes::Weave()
     free(vfCompositeCunningham1B);
     free(vfCompositeCunningham2A);
     free(vfCompositeCunningham2B);
+    
+    free(vCunningham1AMultipliers);
+    free(vCunningham1BMultipliers);
+    free(vCunningham2AMultipliers);
+    free(vCunningham2BMultipliers);
 
     return false;
 }
