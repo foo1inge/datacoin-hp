@@ -35,6 +35,9 @@ contains(RELEASE, 1) {
     !win32:!macx {
         # Linux: static link and extra security (see: https://wiki.debian.org/Hardening)
         LIBS += -Wl,-Bstatic -Wl,-z,relro -Wl,-z,now
+
+	# Linux: Enable bundling libgmp.so with the binary
+	LIBS += -Wl,-rpath,\\\$$ORIGIN
     }
 }
 
