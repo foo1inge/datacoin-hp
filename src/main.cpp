@@ -4785,7 +4785,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 // Primecoin: reset sieve+primality round timer
                 nPrimeTimerStart = GetTimeMicros();
                 // Adjust primorial so that sieve generation takes a set percentage of round time
-                if (nSieveGenTime >= nGenSieveRoundPercentage * nRoundTime / 100)
+                if (nSieveGenTime >= nRoundSievePercentage * nRoundTime / 100)
                     fIncrementPrimorial = true;
                 else
                     fIncrementPrimorial = false;

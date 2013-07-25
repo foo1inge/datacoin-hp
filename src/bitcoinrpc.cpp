@@ -212,8 +212,8 @@ static const CRPCCommand vRPCCommands[] =
     { "setgenerate",            &setgenerate,            true,      false },
     { "getsievepercentage",     &getsievepercentage,     true,      false },
     { "setsievepercentage",     &setsievepercentage,     true,      false },
-    { "getgensieveroundpercentage",&getgensieveroundpercentage,true,false },
-    { "setgensieveroundpercentage",&setgensieveroundpercentage,true,false },
+    { "getroundsievepercentage",&getroundsievepercentage,true,false },
+    { "setroundsievepercentage",&setroundsievepercentage,true,false },
     { "getprimespersec",        &getprimespersec,        true,      false },
     { "getchainspermin",        &getchainspermin,        true,      false },
     { "getinfo",                &getinfo,                true,      false },
@@ -1157,7 +1157,7 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     if (strMethod == "setgenerate"            && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "setsievepercentage"     && n > 0) ConvertTo<boost::int64_t>(params[0]);
-    if (strMethod == "setgensieveroundpercentage" && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "setroundsievepercentage" && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "settxfee"               && n > 0) ConvertTo<double>(params[0]);
     if (strMethod == "getreceivedbyaddress"   && n > 1) ConvertTo<boost::int64_t>(params[1]);

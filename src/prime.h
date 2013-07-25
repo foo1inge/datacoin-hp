@@ -11,10 +11,10 @@
 #include <gmpxx.h>
 #include <bitset>
 
-static const unsigned int nMaxGenSieveRoundPercentage = 100;
-static const unsigned int nDefaultGenSieveRoundPercentage = 30;
-static const unsigned int nMinGenSieveRoundPercentage = 1;
-extern unsigned int nGenSieveRoundPercentage;
+static const unsigned int nMaxRoundSievePercentage = 100;
+static const unsigned int nDefaultRoundSievePercentage = 30;
+static const unsigned int nMinRoundSievePercentage = 1;
+extern unsigned int nRoundSievePercentage;
 static const unsigned int nMaxSievePercentage = 100;
 static const unsigned int nDefaultSievePercentage = 10;
 static const unsigned int nMinSievePercentage = 1;

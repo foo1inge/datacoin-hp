@@ -10,14 +10,14 @@ std::vector<unsigned int> vPrimes;
 std::vector<unsigned int> vTwoInverses;
 unsigned int nSieveSize = nDefaultSieveSize;
 unsigned int nSievePercentage = nDefaultSievePercentage;
-unsigned int nGenSieveRoundPercentage = nDefaultGenSieveRoundPercentage;
+unsigned int nRoundSievePercentage = nDefaultRoundSievePercentage;
 
 static unsigned int int_invert(unsigned int a, unsigned int nPrime);
 
 void GeneratePrimeTable()
 {
-    nGenSieveRoundPercentage = (unsigned int)GetArg("-gensieveroundpercentage", nDefaultGenSieveRoundPercentage);
-    nGenSieveRoundPercentage = std::max(std::min(nGenSieveRoundPercentage, nMaxGenSieveRoundPercentage), nMinGenSieveRoundPercentage);
+    nRoundSievePercentage = (unsigned int)GetArg("-roundsievepercentage", nDefaultRoundSievePercentage);
+    nRoundSievePercentage = std::max(std::min(nRoundSievePercentage, nMaxRoundSievePercentage), nMinRoundSievePercentage);
     nSievePercentage = (unsigned int)GetArg("-sievepercentage", nDefaultSievePercentage);
     nSievePercentage = std::max(std::min(nSievePercentage, nMaxSievePercentage), nMinSievePercentage);
     nSieveSize = (unsigned int)GetArg("-sievesize", nDefaultSieveSize);
