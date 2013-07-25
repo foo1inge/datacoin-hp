@@ -4741,11 +4741,16 @@ void static BitcoinMiner(CWallet *pwallet)
             {
                 // Primecoin: a sieve+primality round completes
                 // Primecoin: estimate time to block
+                unsigned int nCalcRoundTests = max(1u, nRoundTests);
+                unsigned int nCalcRoundPrimesHit = max(1u, nRoundPrimesHit);
+                // Make sure the estimated time is very high if only 0 primes were found
+                if (nRoundPrimesHit == 0)
+                    nCalcRoundTests *= 1000;
                 int64 nRoundTime = (GetTimeMicros() - nPrimeTimerStart); 
-                nTimeExpected = nRoundTime / max(1u, nRoundTests);
-                nTimeExpected = nTimeExpected * max(1u, nRoundTests) / max(1u, nRoundPrimesHit);
+                nTimeExpected = nRoundTime / nCalcRoundTests;
+                nTimeExpected = nTimeExpected * nCalcRoundTests / nCalcRoundPrimesHit;
                 for (unsigned int n = 1; n < TargetGetLength(pblock->nBits); n++)
-                    nTimeExpected = nTimeExpected * max(1u, nRoundTests) * 3 / max(1u, nRoundPrimesHit);
+                    nTimeExpected = nTimeExpected * nCalcRoundTests * 3 / nCalcRoundPrimesHit;
                 if (fDebug && GetBoolArg("-printmining"))
                     printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus expect=%us\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, (unsigned int)(nTimeExpected/1000000));
 
@@ -4778,12 +4783,17 @@ void static BitcoinMiner(CWallet *pwallet)
                     break;
 
                 // Primecoin: reset sieve+primality round timer
-                nRoundTests = 0;
-                nRoundPrimesHit = 0;
                 nPrimeTimerStart = GetTimeMicros();
                 if (nTimeExpected > nTimeExpectedPrev)
                     fIncrementPrimorial = !fIncrementPrimorial;
                 nTimeExpectedPrev = nTimeExpected;
+
+                // Primecoin: primorial always needs to be incremented if only 0 primes were found
+                if (nRoundPrimesHit == 0)
+                    fIncrementPrimorial = true;
+
+                nRoundTests = 0;
+                nRoundPrimesHit = 0;
 
                 // Primecoin: dynamic adjustment of primorial multiplier
                 if (fIncrementPrimorial)
