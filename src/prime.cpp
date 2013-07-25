@@ -554,7 +554,7 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
             for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
             {
                 if (lRemainder % vPrimes[nPrimeSeq] == 0)
-                    return false;
+                    return false; // returning here skips the fractional length calculation!
             }
         }
     }
@@ -583,31 +583,13 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
 // Return values
 //   true: n is probable prime
 //   false: n is composite; set fractional length in the nLength output
-static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSophieGermain, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastDiv = false)
+static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSophieGermain, unsigned int& nLength, CPrimalityTestParams& testParams)
 {
     // Faster GMP version
     mpz_t& mpzE = testParams.mpzE;
     mpz_t& mpzR = testParams.mpzR;
     mpz_t& mpzRplusOne = testParams.mpzRplusOne;
 
-    if (fFastDiv)
-    {
-        // Fast divisibility tests
-        // Divide n by a large divisor
-        // Use the remainder to test divisibility by small primes
-        const unsigned int nDivSize = testParams.nFastDivisorsSize;
-        for (unsigned int i = 0; i < nDivSize; i++)
-        {
-            unsigned long lRemainder = mpz_tdiv_ui(n.get_mpz_t(), testParams.vFastDivisors[i]);
-            unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
-            const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
-            for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
-            {
-                if (lRemainder % vPrimes[nPrimeSeq] == 0)
-                    return false;
-            }
-        }
-    }
     mpz_sub_ui(mpzE, n.get_mpz_t(), 1);
     mpz_tdiv_q_2exp(mpzE, mpzE, 1);
     mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, n.get_mpz_t());
@@ -675,12 +657,12 @@ static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGerm
         N += (fSophieGermain? 1 : (-1));
         if (fFermatTest)
         {
-            if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams, true))
+            if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams))
                 break;
         }
         else
         {
-            if (!EulerLagrangeLifchitzPrimalityTestFast(N, fSophieGermain, nProbableChainLength, testParams, true))
+            if (!EulerLagrangeLifchitzPrimalityTestFast(N, fSophieGermain, nProbableChainLength, testParams))
                 break;
         }
     }
