@@ -8,6 +8,7 @@
 #include "db.h"
 #include "init.h"
 #include "bitcoinrpc.h"
+#include "prime.h"
 
 using namespace json_spirit;
 using namespace std;
@@ -49,6 +50,61 @@ Value setgenerate(const Array& params, bool fHelp)
 }
 
 
+Value getsievepercentage(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getsievepercentage\n"
+            "Returns the current sieve percentage used by the mining algorithm.");
+
+    return (boost::int64_t)nSievePercentage;
+}
+
+
+Value setsievepercentage(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1)
+        throw runtime_error(
+            "setsievepercentage <sievepercentage>\n"
+            "<sievepercentage> determines how many rounds the candidate multiplier sieve runs.");
+
+    unsigned int nPercentage = nDefaultSievePercentage;
+    if (params.size() > 0)
+        nPercentage = params[0].get_int();
+
+    nSievePercentage = nPercentage;
+    return Value::null;
+}
+
+
+Value getgensieveroundpercentage(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getgensieveroundpercentage\n"
+            "Returns the current sieve generation time percentage used by the mining algorithm.");
+
+    return (boost::int64_t)nGenSieveRoundPercentage;
+}
+
+
+Value setgensieveroundpercentage(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1)
+        throw runtime_error(
+            "setgensieveroundpercentage <gensieveroundpercentage>\n"
+            "<gensieveroundpercentage> determines much time should be spent generating the sieve of candidate multipliers.\n"
+            "The round primorial is dynamically adjusted based on this value.");
+
+    unsigned int nPercentage = nDefaultGenSieveRoundPercentage;
+    if (params.size() > 0)
+        nPercentage = params[0].get_int();
+
+    nGenSieveRoundPercentage = nPercentage;
+    return Value::null;
+}
+
+
 Value getprimespersec(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -72,9 +128,6 @@ Value getchainspermin(const Array& params, bool fHelp)
 
 
 extern Value getdifficulty(const Array& params, bool fHelp);
-extern unsigned int nSieveSize;
-extern unsigned int nSievePercentage;
-extern unsigned int nGenSieveRoundPercentage;
 
 
 Value getmininginfo(const Array& params, bool fHelp)

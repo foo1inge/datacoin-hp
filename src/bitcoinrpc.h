@@ -149,6 +149,10 @@ extern json_spirit::Value importprivkey(const json_spirit::Array& params, bool f
 
 extern json_spirit::Value getgenerate(const json_spirit::Array& params, bool fHelp); // in rpcmining.cpp
 extern json_spirit::Value setgenerate(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getsievepercentage(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value setsievepercentage(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getgensieveroundpercentage(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value setgensieveroundpercentage(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getprimespersec(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getchainspermin(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getmininginfo(const json_spirit::Array& params, bool fHelp);
