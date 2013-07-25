@@ -74,6 +74,7 @@ Value getchainspermin(const Array& params, bool fHelp)
 extern Value getdifficulty(const Array& params, bool fHelp);
 extern unsigned int nSieveSize;
 extern unsigned int nSievePercentage;
+extern unsigned int nGenSieveRoundPercentage;
 
 
 Value getmininginfo(const Array& params, bool fHelp)
@@ -92,6 +93,7 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
     obj.push_back(Pair("generate",      GetBoolArg("-gen")));
     obj.push_back(Pair("genproclimit",  (int)GetArg("-genproclimit", -1)));
+    obj.push_back(Pair("gensieveroundpercentage",(int)nGenSieveRoundPercentage));
     obj.push_back(Pair("primespersec",  getprimespersec(params, false)));
     obj.push_back(Pair("pooledtx",      (uint64_t)mempool.size()));
     obj.push_back(Pair("sievepercentage",(int)nSievePercentage));

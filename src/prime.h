@@ -11,6 +11,10 @@
 #include <gmpxx.h>
 #include <bitset>
 
+static const unsigned int nMaxGenSieveRoundPercentage = 100;
+static const unsigned int nDefaultGenSieveRoundPercentage = 30;
+static const unsigned int nMinGenSieveRoundPercentage = 1;
+extern unsigned int nGenSieveRoundPercentage;
 static const unsigned int nMaxSievePercentage = 100;
 static const unsigned int nDefaultSievePercentage = 10;
 static const unsigned int nMinSievePercentage = 1;
@@ -78,7 +82,7 @@ bool TargetGetMint(unsigned int nBits, uint64& nMint);
 bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, int64 nActualSpacing, unsigned int& nBitsNext);
 
 // Mine probable prime chain of form: n = h * p# +/- 1
-bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash, unsigned int nPrimorialMultiplier);
+bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash, unsigned int nPrimorialMultiplier, int64& nSieveGenTime);
 
 // Check prime proof-of-work
 enum // prime chain type

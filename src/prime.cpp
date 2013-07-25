@@ -10,11 +10,14 @@ std::vector<unsigned int> vPrimes;
 std::vector<unsigned int> vTwoInverses;
 unsigned int nSieveSize = nDefaultSieveSize;
 unsigned int nSievePercentage = nDefaultSievePercentage;
+unsigned int nGenSieveRoundPercentage = nDefaultGenSieveRoundPercentage;
 
 static unsigned int int_invert(unsigned int a, unsigned int nPrime);
 
 void GeneratePrimeTable()
 {
+    nGenSieveRoundPercentage = (unsigned int)GetArg("-gensieveroundpercentage", nDefaultGenSieveRoundPercentage);
+    nGenSieveRoundPercentage = std::max(std::min(nGenSieveRoundPercentage, nMaxGenSieveRoundPercentage), nMinGenSieveRoundPercentage);
     nSievePercentage = (unsigned int)GetArg("-sievepercentage", nDefaultSievePercentage);
     nSievePercentage = std::max(std::min(nSievePercentage, nMaxSievePercentage), nMinSievePercentage);
     nSieveSize = (unsigned int)GetArg("-sievesize", nDefaultSieveSize);
@@ -707,7 +710,7 @@ static bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPr
 boost::thread_specific_ptr<CSieveOfEratosthenes> psieve;
 
 // Mine probable prime chain of form: n = h * p# +/- 1
-bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash, unsigned int nPrimorialMultiplier)
+bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash, unsigned int nPrimorialMultiplier, int64& nSieveGenTime)
 {
     CSieveOfEratosthenes *lpsieve;
     nProbableChainLength = 0;
@@ -731,8 +734,9 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
         nStart = GetTimeMicros();
         lpsieve = new CSieveOfEratosthenes(nSieveSize, nBits, mpzHash, mpzFixedMultiplier, pindexPrev);
         while (lpsieve->Weave() && pindexPrev == pindexBest);
+        nSieveGenTime = GetTimeMicros() - nStart;
         if (fDebug && GetBoolArg("-printmining"))
-            printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", lpsieve->GetCandidateCount(), nSieveSize, lpsieve->GetProgressPercentage(), (unsigned int) (GetTimeMicros() - nStart));
+            printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", lpsieve->GetCandidateCount(), nSieveSize, lpsieve->GetProgressPercentage(), (unsigned int) nSieveGenTime);
         psieve.reset(lpsieve);
         return false; // sieve generation takes time so return now
     }

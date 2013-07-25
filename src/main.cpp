@@ -4577,7 +4577,7 @@ void static BitcoinMiner(CWallet *pwallet)
     static const unsigned int nPrimorialHashFactor = 7;
     unsigned int nPrimorialMultiplier = nPrimorialHashFactor;
     int64 nTimeExpected = 0;   // time expected to prime chain (micro-second)
-    int64 nTimeExpectedPrev = 0; // time expected to prime chain last time
+    int64 nSieveGenTime = 0; // how many milliseconds sieve generation took
     bool fIncrementPrimorial = true; // increase or decrease primorial factor
 
     try { loop {
@@ -4667,7 +4667,7 @@ void static BitcoinMiner(CWallet *pwallet)
 
             // Primecoin: mine for prime chain
             unsigned int nProbableChainLength;
-            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, nChainsHit, mpzHash, nPrimorialMultiplier))
+            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, nChainsHit, mpzHash, nPrimorialMultiplier, nSieveGenTime))
             {
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
                 CheckWork(pblock, *pwalletMain, reservekey);
@@ -4784,9 +4784,11 @@ void static BitcoinMiner(CWallet *pwallet)
 
                 // Primecoin: reset sieve+primality round timer
                 nPrimeTimerStart = GetTimeMicros();
-                if (nTimeExpected > nTimeExpectedPrev)
-                    fIncrementPrimorial = !fIncrementPrimorial;
-                nTimeExpectedPrev = nTimeExpected;
+                // Adjust primorial so that sieve generation takes a set percentage of round time
+                if (nSieveGenTime >= nGenSieveRoundPercentage * nRoundTime / 100)
+                    fIncrementPrimorial = true;
+                else
+                    fIncrementPrimorial = false;
 
                 // Primecoin: primorial always needs to be incremented if only 0 primes were found
                 if (nRoundPrimesHit == 0)
