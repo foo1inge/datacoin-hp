@@ -43,7 +43,8 @@ LIBS += \
    -l ssl \
    -l crypto \
  -Wl,-Bdynamic \
-   -l gmp
+   -l gmp \
+ -Wl,-B$(LMODE)
 
 TESTLIBS += \
  -Wl,-B$(LMODE) \
