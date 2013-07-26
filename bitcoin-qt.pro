@@ -217,7 +217,9 @@ HEADERS += src/qt/bitcoingui.h \
     src/leveldb.h \
     src/threadsafety.h \
     src/limitedmap.h \
-    src/qt/splashscreen.h
+    src/qt/splashscreen.h \
+    src/prime.h \
+    src/checkpointsync.h
 
 SOURCES += src/qt/bitcoin.cpp \
     src/qt/bitcoingui.cpp \
