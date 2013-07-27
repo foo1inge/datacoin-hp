@@ -114,6 +114,8 @@ class CSieveOfEratosthenes
 
     // final set of candidates for probable primality checking
     unsigned long *vfCandidates;
+    unsigned long *vfCandidateBiTwin;
+    unsigned long *vfCandidateCunningham1;
     
     static const unsigned int nWordBits = 8 * sizeof(unsigned long);
     unsigned int nCandidatesWords;
@@ -190,12 +192,18 @@ public:
         nCandidatesWords = (nSieveSize + nWordBits - 1) / nWordBits;
         nCandidatesBytes = nCandidatesWords * sizeof(unsigned long);
         vfCandidates = (unsigned long *)malloc(nCandidatesBytes);
+        vfCandidateBiTwin = (unsigned long *)malloc(nCandidatesBytes);
+        vfCandidateCunningham1 = (unsigned long *)malloc(nCandidatesBytes);
         memset(vfCandidates, 0, nCandidatesBytes);
+        memset(vfCandidateBiTwin, 0, nCandidatesBytes);
+        memset(vfCandidateCunningham1, 0, nCandidatesBytes);
     }
-    
+
     ~CSieveOfEratosthenes()
     {
         free(vfCandidates);
+        free(vfCandidateBiTwin);
+        free(vfCandidateCunningham1);
     }
 
     // Get total number of candidates for power test
@@ -229,7 +237,7 @@ public:
     // Return values:
     //   True - found next candidate; nVariableMultiplier has the candidate
     //   False - scan complete, no more candidate and reset scan
-    bool GetNextCandidateMultiplier(unsigned int& nVariableMultiplier)
+    bool GetNextCandidateMultiplier(unsigned int& nVariableMultiplier, unsigned int& nCandidateType)
     {
         unsigned long lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
         loop
@@ -253,6 +261,12 @@ public:
             if (lBits & GetBitMask(nCandidateMultiplier))
             {
                 nVariableMultiplier = nCandidateMultiplier;
+                if (vfCandidateBiTwin[GetWordNum(nCandidateMultiplier)] & GetBitMask(nCandidateMultiplier))
+                    nCandidateType = PRIME_CHAIN_BI_TWIN;
+                else if (vfCandidateCunningham1[GetWordNum(nCandidateMultiplier)] & GetBitMask(nCandidateMultiplier))
+                    nCandidateType = PRIME_CHAIN_CUNNINGHAM1;
+                else
+                    nCandidateType = PRIME_CHAIN_CUNNINGHAM2;
                 return true;
             }
         }

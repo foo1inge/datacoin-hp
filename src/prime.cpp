@@ -505,22 +505,16 @@ public:
     // Values specific to a round
     unsigned int nBits;
     unsigned int nPrimorialSeq;
-
-    // This is currently always false when mining
-    static const bool fFermatTest = false;
+    unsigned int nCandidateType;
 
     // Results
-    unsigned int nChainLengthCunningham1;
-    unsigned int nChainLengthCunningham2;
-    unsigned int nChainLengthBiTwin;
+    unsigned int nChainLength;
 
     CPrimalityTestParams(unsigned int nBits, unsigned int nPrimorialSeq)
     {
         this->nBits = nBits;
         this->nPrimorialSeq = nPrimorialSeq;
-        nChainLengthCunningham1 = 0;
-        nChainLengthCunningham2 = 0;
-        nChainLengthBiTwin = 0;
+        nChainLength = 0;
         mpz_init(mpzE);
         mpz_init(mpzR);
         mpz_init(mpzRplusOne);
@@ -680,30 +674,43 @@ static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGerm
 static bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPrimalityTestParams& testParams)
 {
     const unsigned int nBits = testParams.nBits;
-    unsigned int& nChainLengthCunningham1 = testParams.nChainLengthCunningham1;
-    unsigned int& nChainLengthCunningham2 = testParams.nChainLengthCunningham2;
-    unsigned int& nChainLengthBiTwin = testParams.nChainLengthBiTwin;
-    const bool fFermatTest = testParams.fFermatTest;
+    const unsigned int nCandidateType = testParams.nCandidateType;
+    unsigned int& nChainLength = testParams.nChainLength;
     mpz_class& mpzOriginMinusOne = testParams.mpzOriginMinusOne;
     mpz_class& mpzOriginPlusOne = testParams.mpzOriginPlusOne;
-    nChainLengthCunningham1 = 0;
-    nChainLengthCunningham2 = 0;
-    nChainLengthBiTwin = 0;
+    nChainLength = 0;
 
     // Test for Cunningham Chain of first kind
-    mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
-    ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, fFermatTest, nChainLengthCunningham1, testParams);
-    // Test for Cunningham Chain of second kind
-    mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
-    ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, fFermatTest, nChainLengthCunningham2, testParams);
-    // Figure out BiTwin Chain length
-    // BiTwin Chain allows a single prime at the end for odd length chain
-    nChainLengthBiTwin =
-        (TargetGetLength(nChainLengthCunningham1) > TargetGetLength(nChainLengthCunningham2))?
-            (nChainLengthCunningham2 + TargetFromInt(TargetGetLength(nChainLengthCunningham2)+1)) :
-            (nChainLengthCunningham1 + TargetFromInt(TargetGetLength(nChainLengthCunningham1)));
+    if (nCandidateType == PRIME_CHAIN_CUNNINGHAM1)
+    {
+        mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
+        ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, false, nChainLength, testParams);
+    }
+    else if (nCandidateType == PRIME_CHAIN_CUNNINGHAM2)
+    {
+        // Test for Cunningham Chain of second kind
+        mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
+        ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, false, nChainLength, testParams);
+    }
+    else
+    {
+        unsigned int nChainLengthCunningham1 = 0;
+        unsigned int nChainLengthCunningham2 = 0;
+        mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
+        if (ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, false, nChainLengthCunningham1, testParams))
+        {
+            mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
+            ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, false, nChainLengthCunningham2, testParams);
+            // Figure out BiTwin Chain length
+            // BiTwin Chain allows a single prime at the end for odd length chain
+            nChainLength =
+                (TargetGetLength(nChainLengthCunningham1) > TargetGetLength(nChainLengthCunningham2))?
+                    (nChainLengthCunningham2 + TargetFromInt(TargetGetLength(nChainLengthCunningham2)+1)) :
+                    (nChainLengthCunningham1 + TargetFromInt(TargetGetLength(nChainLengthCunningham1)));
+        }
+    }
 
-    return (nChainLengthCunningham1 >= nBits || nChainLengthCunningham2 >= nBits || nChainLengthBiTwin >= nBits);
+    return (nChainLength >= nBits);
 }
 
 // Sieve for mining
@@ -782,10 +789,9 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
 
     nStart = GetTimeMicros();
     
-    // References to counters;
-    unsigned int& nChainLengthCunningham1 = testParams.nChainLengthCunningham1;
-    unsigned int& nChainLengthCunningham2 = testParams.nChainLengthCunningham2;
-    unsigned int& nChainLengthBiTwin = testParams.nChainLengthBiTwin;
+    // References to test parameters
+    unsigned int& nChainLength = testParams.nChainLength;
+    unsigned int& nCandidateType = testParams.nCandidateType;
     
     // Number of candidates to be tested during a single call to this function
     const unsigned int nTestsAtOnce = 500;
@@ -794,7 +800,7 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
     while (nTests < nTestsAtOnce && pindexPrev == pindexBest)
     {
         nTests++;
-        if (!lpsieve->GetNextCandidateMultiplier(nTriedMultiplier))
+        if (!lpsieve->GetNextCandidateMultiplier(nTriedMultiplier, nCandidateType))
         {
             // power tests completed for the sieve
             //if (fDebug && GetBoolArg("-printmining"))
@@ -804,21 +810,19 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
             return false;
         }
         mpzChainOrigin = mpzHashMultiplier * nTriedMultiplier;
-        nChainLengthCunningham1 = 0;
-        nChainLengthCunningham2 = 0;
-        nChainLengthBiTwin = 0;
+        nChainLength = 0;
         if (ProbablePrimeChainTestFast(mpzChainOrigin, testParams))
         {
             mpz_class mpzPrimeChainMultiplier = mpzFixedMultiplier * nTriedMultiplier;
             CBigNum bnPrimeChainMultiplier;
             bnPrimeChainMultiplier.SetHex(mpzPrimeChainMultiplier.get_str(16));
             block.bnPrimeChainMultiplier = bnPrimeChainMultiplier;
-            printf("Probable prime chain found for block=%s!!\n  Target: %s\n  Length: (%s %s %s)\n", block.GetHash().GetHex().c_str(),
-            TargetToString(nBits).c_str(), TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str());
-            nProbableChainLength = std::max(std::max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
+            printf("Probable prime chain found for block=%s!!\n  Target: %s\n  Chain: %s\n", block.GetHash().GetHex().c_str(),
+                TargetToString(block.nBits).c_str(), GetPrimeChainName(nCandidateType, nChainLength).c_str());
+            nProbableChainLength = nChainLength;
             return true;
         }
-        nProbableChainLength = std::max(std::max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
+        nProbableChainLength = nChainLength;
         if(TargetGetLength(nProbableChainLength) >= 1)
             nPrimesHit++;
         if(TargetGetLength(nProbableChainLength) >= nStatsChainLength)
@@ -1065,17 +1069,22 @@ bool CSieveOfEratosthenes::Weave()
         {
             // Fast version
             const unsigned int nBytes = (nMaxMultiplier - nMinMultiplier + 7) / 8;
-            unsigned long *lCandidates = (unsigned long *)vfCandidates + (nMinMultiplier / nWordBits);
-            unsigned long *lCompositeCunningham1A = (unsigned long *)vfCompositeCunningham1A + (nMinMultiplier / nWordBits);
-            unsigned long *lCompositeCunningham1B = (unsigned long *)vfCompositeCunningham1B + (nMinMultiplier / nWordBits);
-            unsigned long *lCompositeCunningham2A = (unsigned long *)vfCompositeCunningham2A + (nMinMultiplier / nWordBits);
-            unsigned long *lCompositeCunningham2B = (unsigned long *)vfCompositeCunningham2B + (nMinMultiplier / nWordBits);
+            unsigned long *pCandidates = (unsigned long *)vfCandidates + (nMinMultiplier / nWordBits);
+            unsigned long *pCandidateBiTwin = (unsigned long *)vfCandidateBiTwin + (nMinMultiplier / nWordBits);
+            unsigned long *pCandidateCunningham1 = (unsigned long *)vfCandidateCunningham1 + (nMinMultiplier / nWordBits);
+            unsigned long *pCompositeCunningham1A = (unsigned long *)vfCompositeCunningham1A + (nMinMultiplier / nWordBits);
+            unsigned long *pCompositeCunningham1B = (unsigned long *)vfCompositeCunningham1B + (nMinMultiplier / nWordBits);
+            unsigned long *pCompositeCunningham2A = (unsigned long *)vfCompositeCunningham2A + (nMinMultiplier / nWordBits);
+            unsigned long *pCompositeCunningham2B = (unsigned long *)vfCompositeCunningham2B + (nMinMultiplier / nWordBits);
             const unsigned int nLongs = (nBytes + sizeof(unsigned long) - 1) / sizeof(unsigned long);
             for (unsigned int i = 0; i < nLongs; i++)
             {
-                lCandidates[i] = ~((lCompositeCunningham1A[i] | lCompositeCunningham1B[i]) &
-                                (lCompositeCunningham2A[i] | lCompositeCunningham2B[i]) &
-                                (lCompositeCunningham1A[i] | lCompositeCunningham2A[i]));
+                const unsigned long lCompositeCunningham1 = pCompositeCunningham1A[i] | pCompositeCunningham1B[i];
+                const unsigned long lCompositeCunningham2 = pCompositeCunningham2A[i] | pCompositeCunningham2B[i];
+                const unsigned long lCompositeBiTwin = pCompositeCunningham1A[i] | pCompositeCunningham2A[i];
+                pCandidateBiTwin[i] = ~lCompositeBiTwin;
+                pCandidateCunningham1[i] = ~lCompositeCunningham1;
+                pCandidates[i] = ~(lCompositeCunningham1 & lCompositeCunningham2 & lCompositeBiTwin);
             }
         }
     }

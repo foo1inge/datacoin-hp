@@ -4748,9 +4748,8 @@ void static BitcoinMiner(CWallet *pwallet)
                     nCalcRoundTests *= 1000;
                 int64 nRoundTime = (GetTimeMicros() - nPrimeTimerStart); 
                 nTimeExpected = nRoundTime / nCalcRoundTests;
-                nTimeExpected = nTimeExpected * nCalcRoundTests / nCalcRoundPrimesHit;
                 for (unsigned int n = 1; n < TargetGetLength(pblock->nBits); n++)
-                    nTimeExpected = nTimeExpected * nCalcRoundTests * 3 / nCalcRoundPrimesHit;
+                    nTimeExpected = nTimeExpected * nCalcRoundTests / nCalcRoundPrimesHit;
                 if (fDebug && GetBoolArg("-printmining"))
                     printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus expect=%us\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, (unsigned int)(nTimeExpected/1000000));
 
