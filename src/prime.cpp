@@ -5,6 +5,10 @@
 #include "prime.h"
 #include <climits>
 
+/**********************/
+/* PRIMECOIN PROTOCOL */
+/**********************/
+
 // Prime Table
 std::vector<unsigned int> vPrimes;
 unsigned int nSieveSize = nDefaultSieveSize;
@@ -266,12 +270,6 @@ bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, in
     return true;
 }
 
-//
-// **************************************
-// PROOF OF WORK VERIFICATION CODE BEGINS
-// **************************************
-//
-
 // Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
 // true: n is probable prime
 // false: n is composite; set fractional length in the nLength output
@@ -328,6 +326,12 @@ static bool EulerLagrangeLifchitzPrimalityTest(const CBigNum& n, bool fSophieGer
         return error("EulerLagrangeLifchitzPrimalityTest() : fractional assert");
     nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
     return false;
+}
+
+// prime chain type and length value
+std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength)
+{
+    return strprintf("%s%s", (nChainType==PRIME_CHAIN_CUNNINGHAM1)? "1CC" : ((nChainType==PRIME_CHAIN_CUNNINGHAM2)? "2CC" : "TWN"), TargetToString(nChainLength).c_str());
 }
 
 // Test Probable Cunningham Chain for: n
@@ -467,11 +471,33 @@ bool CheckPrimeProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CB
     return true;
 }
 
-//
-// ************************************
-// PROOF OF WORK VERIFICATION CODE ENDS
-// ************************************
-//
+// prime target difficulty value for visualization
+double GetPrimeDifficulty(unsigned int nBits)
+{
+    return ((double) nBits / (double) (1 << nFractionalBits));
+}
+
+// Estimate work transition target to longer prime chain
+unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned int nBits, unsigned int nChainLength)
+{
+    int64 nInterval = 500;
+    int64 nWorkTransition = nPrevWorkTransition;
+    unsigned int nBitsCeiling = 0;
+    TargetSetLength(TargetGetLength(nBits)+1, nBitsCeiling);
+    unsigned int nBitsFloor = 0;
+    TargetSetLength(TargetGetLength(nBits), nBitsFloor);
+    uint64 nFractionalDifficulty = TargetGetFractionalDifficulty(nBits);
+    bool fLonger = (TargetGetLength(nChainLength) > TargetGetLength(nBits));
+    if (fLonger)
+        nWorkTransition = (nWorkTransition * (((nInterval - 1) * nFractionalDifficulty) >> 32) + 2 * ((uint64) nBitsFloor)) / ((((nInterval - 1) * nFractionalDifficulty) >> 32) + 2);
+    else
+        nWorkTransition = ((nInterval - 1) * nWorkTransition + 2 * ((uint64) nBitsCeiling)) / (nInterval + 1);
+    return nWorkTransition;
+}
+
+/********************/
+/* PRIMECOIN MINING */
+/********************/
 
 // Number of primes to test with fast divisibility testing
 static const unsigned int nFastDivPrimes = 60;
@@ -826,37 +852,6 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
     
     return false; // stop as new block arrived
 }
-
-// prime target difficulty value for visualization
-double GetPrimeDifficulty(unsigned int nBits)
-{
-    return ((double) nBits / (double) (1 << nFractionalBits));
-}
-
-// Estimate work transition target to longer prime chain
-unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned int nBits, unsigned int nChainLength)
-{
-    int64 nInterval = 500;
-    int64 nWorkTransition = nPrevWorkTransition;
-    unsigned int nBitsCeiling = 0;
-    TargetSetLength(TargetGetLength(nBits)+1, nBitsCeiling);
-    unsigned int nBitsFloor = 0;
-    TargetSetLength(TargetGetLength(nBits), nBitsFloor);
-    uint64 nFractionalDifficulty = TargetGetFractionalDifficulty(nBits);
-    bool fLonger = (TargetGetLength(nChainLength) > TargetGetLength(nBits));
-    if (fLonger)
-        nWorkTransition = (nWorkTransition * (((nInterval - 1) * nFractionalDifficulty) >> 32) + 2 * ((uint64) nBitsFloor)) / ((((nInterval - 1) * nFractionalDifficulty) >> 32) + 2);
-    else
-        nWorkTransition = ((nInterval - 1) * nWorkTransition + 2 * ((uint64) nBitsCeiling)) / (nInterval + 1);
-    return nWorkTransition;
-}
-
-// prime chain type and length value
-std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength)
-{
-    return strprintf("%s%s", (nChainType==PRIME_CHAIN_CUNNINGHAM1)? "1CC" : ((nChainType==PRIME_CHAIN_CUNNINGHAM2)? "2CC" : "TWN"), TargetToString(nChainLength).c_str());
-}
-
 
 // Get progress percentage of the sieve
 unsigned int CSieveOfEratosthenes::GetProgressPercentage()
