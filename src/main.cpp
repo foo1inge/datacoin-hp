@@ -71,6 +71,7 @@ const string strMessageMagic = "Primecoin Signed Message:\n";
 
 double dPrimesPerSec = 0.0;
 double dChainsPerMinute = 0.0;
+double dChainsPerDay = 0.0;
 int64 nHPSTimerStart = 0;
 
 // Settings
@@ -4681,6 +4682,7 @@ void static BitcoinMiner(CWallet *pwallet)
             static volatile int64 nPrimeCounter;
             static volatile int64 nTestCounter;
             static volatile int64 nChainCounter;
+            static double dChainExpected;
             int64 nMillisNow = GetTimeMillis();
             if (nHPSTimerStart == 0)
             {
@@ -4688,6 +4690,7 @@ void static BitcoinMiner(CWallet *pwallet)
                 nPrimeCounter = 0;
                 nTestCounter = 0;
                 nChainCounter = 0;
+                dChainExpected = 0;
             }
             else
             {
@@ -4713,15 +4716,17 @@ void static BitcoinMiner(CWallet *pwallet)
                         dPrimesPerSec = dPrimesPerMinute / 60.0;
                         double dTestsPerMinute = 60000.0 * nTestCounter / (nMillisNow - nHPSTimerStart);
                         dChainsPerMinute = 60000.0 * nChainCounter / (nMillisNow - nHPSTimerStart);
+                        dChainsPerDay = 86400000.0 * dChainExpected / (GetTimeMillis() - nHPSTimerStart);
                         nHPSTimerStart = nMillisNow;
                         nPrimeCounter = 0;
                         nTestCounter = 0;
                         nChainCounter = 0;
+                        dChainExpected = 0;
                         static int64 nLogTime = 0;
                         if (nMillisNow - nLogTime > 59000)
                         {
                             nLogTime = nMillisNow;
-                            printf("%s primemeter %9.0f prime/h %9.0f test/h %9.0f %d-chains/h\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLogTime / 1000).c_str(), dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0, dChainsPerMinute * 60.0, nStatsChainLength);
+                            printf("%s primemeter %9.0f prime/h %9.0f test/h %4.0f %d-chains/h %3.6f chain/d\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLogTime / 1000).c_str(), dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0, dChainsPerMinute * 60.0, nStatsChainLength, dChainsPerDay);
                         }
                     }
                 }
@@ -4748,10 +4753,16 @@ void static BitcoinMiner(CWallet *pwallet)
                     nCalcRoundTests *= 1000;
                 int64 nRoundTime = (GetTimeMicros() - nPrimeTimerStart); 
                 nTimeExpected = nRoundTime / nCalcRoundTests;
-                for (unsigned int n = 1; n < TargetGetLength(pblock->nBits); n++)
+                double dRoundChainExpected = (double) nRoundTests;
+                double dPrimeProbability = EstimateCandidatePrimeProbability(nPrimorialMultiplier);
+                for (unsigned int n = 0, nTargetLength = TargetGetLength(pblock->nBits); n < nTargetLength; n++)
+                {
                     nTimeExpected = nTimeExpected * nCalcRoundTests / nCalcRoundPrimesHit;
+                    dRoundChainExpected *= dPrimeProbability;
+                }
+                dChainExpected += dRoundChainExpected;
                 if (fDebug && GetBoolArg("-printmining"))
-                    printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus expect=%us\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, (unsigned int)(nTimeExpected/1000000));
+                    printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus tochain=%6.3fd expect=%3.9f\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, ((double)(nTimeExpected/1000000))/86400.0, dRoundChainExpected);
 
                 // Primecoin: update time and nonce
                 pblock->nTime = max(pblock->nTime, (unsigned int) GetAdjustedTime());

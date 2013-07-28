@@ -1160,3 +1160,22 @@ bool CSieveOfEratosthenes::Weave()
 
     return false;
 }
+
+// Estimate the probability of primality for a number in a candidate chain
+double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier)
+{
+    // h * q# is prime with probability 1/log(h * q#)   (prime number theorem)
+    // log(p#) ~ p
+    // Euler product to p ~ 1.781072 * log(p)   (Mertens theorem)
+    // If sieve is weaved up to p, a number in a candidate chain is a prime
+    // with probability
+    //     (1/log(h * q#)) / (1/(1.781072 * log(p)))
+    //   = 1.781072 * log(p) / (256 * log(2) + q)
+    //
+    // This model assumes that the numbers on a chain being primes are
+    // statistically independent after running the sieve, which might not be
+    // true, but nontheless it's a reasonable model of the chances of finding
+    // prime chains.
+    const unsigned int nSieveWeaveOptimal = (uint64)nSievePercentage * vPrimes.size() / 100;
+    return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimal)) / (256.0 * log(2.0) + (double) nPrimorialMultiplier));
+}

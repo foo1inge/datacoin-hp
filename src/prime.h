@@ -11,6 +11,10 @@
 #include <gmpxx.h>
 #include <bitset>
 
+/**********************/
+/* PRIMECOIN PROTOCOL */
+/**********************/
+
 static const unsigned int nMaxRoundSievePercentage = 100;
 static const unsigned int nDefaultRoundSievePercentage = 30;
 static const unsigned int nMinRoundSievePercentage = 1;
@@ -81,9 +85,6 @@ unsigned int TargetFromInt(unsigned int nLength);
 bool TargetGetMint(unsigned int nBits, uint64& nMint);
 bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, int64 nActualSpacing, unsigned int& nBitsNext);
 
-// Mine probable prime chain of form: n = h * p# +/- 1
-bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash, unsigned int nPrimorialMultiplier, int64& nSieveGenTime, CBlockIndex* pindexPrev);
-
 // Check prime proof-of-work
 enum // prime chain type
 {
@@ -99,6 +100,17 @@ double GetPrimeDifficulty(unsigned int nBits);
 unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned int nBits, unsigned int nChainLength);
 // prime chain type and length value
 std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength);
+
+
+/********************/
+/* PRIMECOIN MINING */
+/********************/
+
+// Mine probable prime chain of form: n = h * p# +/- 1
+bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash, unsigned int nPrimorialMultiplier, int64& nSieveGenTime, CBlockIndex* pindexPrev);
+
+// Estimate the probability of primality for a number in a candidate chain
+double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier);
 
 #if defined(__i386__) || defined(_M_IX86) || defined(_X86_) || defined(__x86_64__) || defined(_M_X64)
 #define USE_ROTATE
