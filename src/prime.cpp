@@ -7,7 +7,6 @@
 
 // Prime Table
 std::vector<unsigned int> vPrimes;
-std::vector<unsigned int> vTwoInverses;
 unsigned int nSieveSize = nDefaultSieveSize;
 unsigned int nSievePercentage = nDefaultSievePercentage;
 unsigned int nRoundSievePercentage = nDefaultRoundSievePercentage;
@@ -41,13 +40,6 @@ void GeneratePrimeTable()
     //BOOST_FOREACH(unsigned int nPrime, vPrimes)
     //    printf(" %u", nPrime);
     printf("\n");
-    
-    const unsigned int nPrimes = vPrimes.size();
-    vTwoInverses = std::vector<unsigned int> (nPrimes, 0);
-    for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
-    {
-        vTwoInverses[nPrimeSeq] = int_invert(2, vPrimes[nPrimeSeq]);
-    }
 }
 
 // Get next prime number of p
@@ -1018,7 +1010,7 @@ bool CSieveOfEratosthenes::Weave()
         unsigned int nFixedInverse = int_invert(nFixedFactorMod, nPrime);
         if (!nFixedInverse)
             return error("CSieveOfEratosthenes::Weave(): int_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-        unsigned int nTwoInverse = vTwoInverses[nPrimeSeq];
+	unsigned int nTwoInverse = (nPrime + 1) / 2;
 
         // Weave the sieve for the prime
         for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
