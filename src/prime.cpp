@@ -1010,34 +1010,93 @@ bool CSieveOfEratosthenes::Weave()
         unsigned int nFixedInverse = int_invert(nFixedFactorMod, nPrime);
         if (!nFixedInverse)
             return error("CSieveOfEratosthenes::Weave(): int_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-	unsigned int nTwoInverse = (nPrime + 1) / 2;
+        unsigned int nTwoInverse = (nPrime + 1) / 2;
 
-        // Weave the sieve for the prime
-        for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
+        // Check whether 32-bit arithmetic can be used for nFixedInverse
+        const bool fUse32BArithmetic = (UINT_MAX / nTwoInverse) >= nPrime;
+
+        if (fUse32BArithmetic)
         {
-            // Find the first number that's divisible by this prime
-            unsigned int nSolvedMultiplier;
-            if (nBiTwinSeq % 2 == 0)
+            // Weave the sieve for the prime
+            unsigned int nBiTwinSeq;
+            for (nBiTwinSeq = 0; nBiTwinSeq < nChainLength; nBiTwinSeq++)
             {
-                nSolvedMultiplier = nFixedInverse;
-            }
-            else
-            {
-                nSolvedMultiplier = nPrime - nFixedInverse;
-                nFixedInverse = (uint64)nFixedInverse * nTwoInverse % nPrime;
+                if (nBiTwinSeq % 2 == 0)
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nFixedInverse;
+                    AddMultiplier(vCunningham1AMultipliers, nPrimeSeq, nSolvedMultiplier);
+                }
+                else
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nPrime - nFixedInverse;
+                    AddMultiplier(vCunningham2AMultipliers, nPrimeSeq, nSolvedMultiplier);
+
+                    // For next number in chain
+                    nFixedInverse = nFixedInverse * nTwoInverse % nPrime;
+                }
             }
 
-            if (nBiTwinSeq < nChainLength)
+            for (; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
             {
-                if (((nBiTwinSeq & 1u) == 0))
-                    AddMultiplier(vCunningham1AMultipliers, nPrimeSeq, nSolvedMultiplier);
-                else
-                    AddMultiplier(vCunningham2AMultipliers, nPrimeSeq, nSolvedMultiplier);
-            } else {
-                if (((nBiTwinSeq & 1u) == 0))
+                if (nBiTwinSeq % 2 == 0)
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nFixedInverse;
                     AddMultiplier(vCunningham1BMultipliers, nPrimeSeq, nSolvedMultiplier);
+                }
                 else
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nPrime - nFixedInverse;
                     AddMultiplier(vCunningham2BMultipliers, nPrimeSeq, nSolvedMultiplier);
+
+                    // For next number in chain
+                    nFixedInverse = nFixedInverse * nTwoInverse % nPrime;
+                }
+            }
+        }
+        else
+        {
+            // Weave the sieve for the prime
+            unsigned int nBiTwinSeq;
+            for (nBiTwinSeq = 0; nBiTwinSeq < nChainLength; nBiTwinSeq++)
+            {
+                if (nBiTwinSeq % 2 == 0)
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nFixedInverse;
+                    AddMultiplier(vCunningham1AMultipliers, nPrimeSeq, nSolvedMultiplier);
+                }
+                else
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nPrime - nFixedInverse;
+                    AddMultiplier(vCunningham2AMultipliers, nPrimeSeq, nSolvedMultiplier);
+
+                    // For next number in chain
+                    nFixedInverse = (uint64)nFixedInverse * nTwoInverse % nPrime;
+                }
+            }
+
+            for (; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
+            {
+                if (nBiTwinSeq % 2 == 0)
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nFixedInverse;
+                    AddMultiplier(vCunningham1BMultipliers, nPrimeSeq, nSolvedMultiplier);
+                }
+                else
+                {
+                    // Find the first number that's divisible by this prime
+                    unsigned int nSolvedMultiplier = nPrime - nFixedInverse;
+                    AddMultiplier(vCunningham2BMultipliers, nPrimeSeq, nSolvedMultiplier);
+
+                    // For next number in chain
+                    nFixedInverse = (uint64)nFixedInverse * nTwoInverse % nPrime;
+                }
             }
         }
     }
