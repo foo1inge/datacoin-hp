@@ -1016,10 +1016,16 @@ bool CSieveOfEratosthenes::Weave()
         for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
         {
             // Find the first number that's divisible by this prime
-            int nDelta = ((nBiTwinSeq % 2 == 0)? (-1) : 1);
-            unsigned int nSolvedMultiplier = (uint64)nFixedInverse * (nPrime - nDelta) % nPrime;
-            if (nBiTwinSeq % 2 == 1)
+            unsigned int nSolvedMultiplier;
+            if (nBiTwinSeq % 2 == 0)
+            {
+                nSolvedMultiplier = nFixedInverse;
+            }
+            else
+            {
+                nSolvedMultiplier = nPrime - nFixedInverse;
                 nFixedInverse = (uint64)nFixedInverse * nTwoInverse % nPrime;
+            }
 
             if (nBiTwinSeq < nChainLength)
             {
