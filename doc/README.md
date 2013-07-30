@@ -17,7 +17,7 @@ BTC: 1EaHwHBWeoJtSM2jEdx9Su1NcKvdXbsqxX
 LTC: LPD1zDChmqcqKGHFHuLX2JWMMEC5jD5J4j
 XPM: AJHjbkVzHhHugd5bpKDtddVDfhtEB8jQZ4
 
-Primecoin 0.1.1 BETA
+Primecoin 0.1.2 BETA
 ====================
 
 Copyright (c) 2013 Primecoin Developers
