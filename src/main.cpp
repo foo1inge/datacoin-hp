@@ -4577,7 +4577,7 @@ void static BitcoinMiner(CWallet *pwallet)
 
     static const unsigned int nPrimorialHashFactor = 7;
     unsigned int nPrimorialMultiplier = nPrimorialHashFactor;
-    int64 nTimeExpected = 0;   // time expected to prime chain (micro-second)
+    double nTimeExpected = 0;   // time expected to prime chain (micro-second)
     int64 nSieveGenTime = 0; // how many milliseconds sieve generation took
     bool fIncrementPrimorial = true; // increase or decrease primorial factor
 
@@ -4747,22 +4747,21 @@ void static BitcoinMiner(CWallet *pwallet)
                 // Primecoin: a sieve+primality round completes
                 // Primecoin: estimate time to block
                 unsigned int nCalcRoundTests = max(1u, nRoundTests);
-                unsigned int nCalcRoundPrimesHit = max(1u, nRoundPrimesHit);
                 // Make sure the estimated time is very high if only 0 primes were found
                 if (nRoundPrimesHit == 0)
                     nCalcRoundTests *= 1000;
                 int64 nRoundTime = (GetTimeMicros() - nPrimeTimerStart); 
-                nTimeExpected = nRoundTime / nCalcRoundTests;
+                nTimeExpected = (double) nRoundTime / nCalcRoundTests;
                 double dRoundChainExpected = (double) nRoundTests;
                 double dPrimeProbability = EstimateCandidatePrimeProbability(nPrimorialMultiplier);
                 for (unsigned int n = 0, nTargetLength = TargetGetLength(pblock->nBits); n < nTargetLength; n++)
                 {
-                    nTimeExpected = nTimeExpected * nCalcRoundTests / nCalcRoundPrimesHit;
+                    nTimeExpected = nTimeExpected / max(0.01, dPrimeProbability);
                     dRoundChainExpected *= dPrimeProbability;
                 }
                 dChainExpected += dRoundChainExpected;
                 if (fDebug && GetBoolArg("-printmining"))
-                    printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus tochain=%6.3fd expect=%3.9f\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, ((double)(nTimeExpected/1000000))/86400.0, dRoundChainExpected);
+                    printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus pprob=%1.6f tochain=%6.3fd expect=%3.9f\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, dPrimeProbability, ((nTimeExpected/1000000.0))/86400.0, dRoundChainExpected);
 
                 // Primecoin: update time and nonce
                 pblock->nTime = max(pblock->nTime, (unsigned int) GetAdjustedTime());
