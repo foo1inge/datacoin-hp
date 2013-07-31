@@ -1184,6 +1184,6 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier)
     // statistically independent after running the sieve, which might not be
     // true, but nontheless it's a reasonable model of the chances of finding
     // prime chains.
-    const unsigned int nSieveWeaveOptimal = (uint64)nSievePercentage * vPrimes.size() / 100;
-    return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimal)) / (256.0 * log(2.0) + (double) nPrimorialMultiplier));
+    const unsigned int nSieveWeaveOptimalPrime = vPrimes[(unsigned int) ((uint64) nSievePercentage * vPrimes.size() / 100)];
+    return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimalPrime)) / (256.0 * log(2.0) + (double) nPrimorialMultiplier));
 }
