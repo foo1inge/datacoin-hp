@@ -4575,7 +4575,6 @@ void static BitcoinMiner(CWallet *pwallet)
     CReserveKey reservekey(pwallet);
     unsigned int nExtraNonce = 0;
 
-    static const unsigned int nPrimorialHashFactor = 7;
     unsigned int nPrimorialMultiplier = nPrimorialHashFactor;
     double nTimeExpected = 0;   // time expected to prime chain (micro-second)
     int64 nSieveGenTime = 0; // how many milliseconds sieve generation took
