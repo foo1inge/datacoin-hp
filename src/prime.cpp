@@ -1172,14 +1172,16 @@ bool CSieveOfEratosthenes::Weave()
 // Estimate the probability of primality for a number in a candidate chain
 double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier)
 {
-    // h * q# * s is prime with probability 1/log(h * q# * s),
+    // h * q# / r# * s is prime with probability 1/log(h * q# / r# * s),
     //   (prime number theorem)
-    //   here s ~ max sieve size / 2, log(q#) ~ q
+    //   here s ~ max sieve size / 2,
+    //   h ~ 2^255 * 1.5,
+    //   r = 7 (primorial multiplier embedded in the hash)
     // Euler product to p ~ 1.781072 * log(p)   (Mertens theorem)
     // If sieve is weaved up to p, a number in a candidate chain is a prime
     // with probability
-    //     (1/log(h * q#)) / (1/(1.781072 * log(p)))
-    //   = 1.781072 * log(p) / (256 * log(2) + q)
+    //     (1/log(h * q# / r# * s)) / (1/(1.781072 * log(p)))
+    //   = 1.781072 * log(p) / (255 * log(2) + log(1.5) + log(q# / r#) + log(s))
     //
     // This model assumes that the numbers on a chain being primes are
     // statistically independent after running the sieve, which might not be
@@ -1187,5 +1189,9 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier)
     // prime chains.
     const unsigned int nSieveWeaveOptimalPrime = vPrimes[(unsigned int) ((uint64) nSievePercentage * vPrimes.size() / 100) - 1];
     const unsigned int nAverageCandidateMultiplier = nSieveSize / 2;
-    return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimalPrime)) / (256.0 * log(2.0) + (double) (nPrimorialMultiplier - nPrimorialHashFactor) + log(nAverageCandidateMultiplier)));
+    mpz_class mpzPrimorial;
+    Primorial(nPrimorialMultiplier, mpzPrimorial);
+    mpz_class mpzFixedMultiplier = mpzPrimorial / PrimorialFast(nPrimorialHashFactor);
+    double dFixedMultiplier = mpzFixedMultiplier.get_d();
+    return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimalPrime)) / (255.0 * log(2.0) + log(1.5) + log(dFixedMultiplier) + log(nAverageCandidateMultiplier)));
 }
