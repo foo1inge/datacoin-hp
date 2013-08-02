@@ -1189,9 +1189,10 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier)
     // prime chains.
     const unsigned int nSieveWeaveOptimalPrime = vPrimes[(unsigned int) ((uint64) nSievePercentage * vPrimes.size() / 100) - 1];
     const unsigned int nAverageCandidateMultiplier = nSieveSize / 2;
-    mpz_class mpzPrimorial;
-    Primorial(nPrimorialMultiplier, mpzPrimorial);
-    mpz_class mpzFixedMultiplier = mpzPrimorial / PrimorialFast(nPrimorialHashFactor);
-    double dFixedMultiplier = mpzFixedMultiplier.get_d();
+    double dFixedMultiplier = 1.0;
+    for (unsigned int i = 0; vPrimes[i] <= nPrimorialMultiplier; i++)
+        dFixedMultiplier *= vPrimes[i];
+    for (unsigned int i = 0; vPrimes[i] <= nPrimorialHashFactor; i++)
+        dFixedMultiplier /= vPrimes[i];
     return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimalPrime)) / (255.0 * log(2.0) + log(1.5) + log(dFixedMultiplier) + log(nAverageCandidateMultiplier)));
 }
