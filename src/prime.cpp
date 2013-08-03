@@ -26,7 +26,7 @@ void GeneratePrimeTable()
     nSievePercentage = std::max(std::min(nSievePercentage, nMaxSievePercentage), nMinSievePercentage);
     nSieveSize = (unsigned int)GetArg("-sievesize", nDefaultSieveSize);
     nSieveSize = std::max(std::min(nSieveSize, nMaxSieveSize), nMinSieveSize);
-    printf("GeneratePrimeTable() : setting nSievePercentage = %u, nSieveSize = %u\n", nSievePercentage, nSieveSize);
+    printf("GeneratePrimeTable() : setting nRoundSievePercentage = %u, nSievePercentage = %u, nSieveSize = %u\n", nRoundSievePercentage, nSievePercentage, nSieveSize);
     const unsigned nPrimeTableLimit = nSieveSize;
     vPrimes.clear();
     // Generate prime table using sieve of Eratosthenes
