@@ -16,7 +16,8 @@
 /**********************/
 
 static const unsigned int nMaxRoundSievePercentage = 100;
-static const unsigned int nDefaultRoundSievePercentage = 30;
+static const unsigned int nDefaultRoundSievePercentage = 70;
+static const unsigned int nDefaultRoundSievePercentageTestnet = 30;
 static const unsigned int nMinRoundSievePercentage = 1;
 extern unsigned int nRoundSievePercentage;
 static const unsigned int nMaxSievePercentage = 100;

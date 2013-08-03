@@ -19,7 +19,8 @@ static unsigned int int_invert(unsigned int a, unsigned int nPrime);
 
 void GeneratePrimeTable()
 {
-    nRoundSievePercentage = (unsigned int)GetArg("-roundsievepercentage", nDefaultRoundSievePercentage);
+    unsigned int nDefaultRSPercentage = (fTestNet) ? nDefaultRoundSievePercentageTestnet : nDefaultRoundSievePercentage;
+    nRoundSievePercentage = (unsigned int)GetArg("-roundsievepercentage", nDefaultRSPercentage);
     nRoundSievePercentage = std::max(std::min(nRoundSievePercentage, nMaxRoundSievePercentage), nMinRoundSievePercentage);
     nSievePercentage = (unsigned int)GetArg("-sievepercentage", nDefaultSievePercentage);
     nSievePercentage = std::max(std::min(nSievePercentage, nMaxSievePercentage), nMinSievePercentage);
