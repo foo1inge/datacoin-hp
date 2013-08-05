@@ -1,9 +1,9 @@
 #include <boost/test/unit_test.hpp>
 
-using namespace std;
-
 #include "mruset.h"
 #include "util.h"
+
+using namespace std;
 
 #define NUM_TESTS 16
 #define MAX_SIZE 100
