@@ -1167,8 +1167,11 @@ bool CSieveOfEratosthenes::Weave()
     return false;
 }
 
+static const double dLogTwo = log(2.0);
+static const double dLogOneAndHalf = log(1.5);
+
 // Estimate the probability of primality for a number in a candidate chain
-double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier)
+double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier, unsigned int nChainPrimeNum)
 {
     // h * q# / r# * s is prime with probability 1/log(h * q# / r# * s),
     //   (prime number theorem)
@@ -1192,5 +1195,5 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier)
         dFixedMultiplier *= vPrimes[i];
     for (unsigned int i = 0; vPrimes[i] <= nPrimorialHashFactor; i++)
         dFixedMultiplier /= vPrimes[i];
-    return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimalPrime)) / (255.0 * log(2.0) + log(1.5) + log(dFixedMultiplier) + log(nAverageCandidateMultiplier)));
+    return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimalPrime)) / (255.0 * dLogTwo + dLogOneAndHalf + log(dFixedMultiplier) + log(nAverageCandidateMultiplier) + dLogTwo * nChainPrimeNum));
 }
