@@ -963,12 +963,12 @@ bool CSieveOfEratosthenes::Weave()
     memset(vCunningham2BMultipliers, 0xFF, nMultiplierBytes);
 
     // bitsets that can be combined to obtain the final bitset of candidates
-    unsigned long *vfCompositeCunningham1A = (unsigned long *)malloc(nCandidatesBytes);
-    unsigned long *vfCompositeCunningham1B = (unsigned long *)malloc(nCandidatesBytes);
-    unsigned long *vfCompositeCunningham2A = (unsigned long *)malloc(nCandidatesBytes);
-    unsigned long *vfCompositeCunningham2B = (unsigned long *)malloc(nCandidatesBytes);
+    sieve_word_t *vfCompositeCunningham1A = (sieve_word_t *)malloc(nCandidatesBytes);
+    sieve_word_t *vfCompositeCunningham1B = (sieve_word_t *)malloc(nCandidatesBytes);
+    sieve_word_t *vfCompositeCunningham2A = (sieve_word_t *)malloc(nCandidatesBytes);
+    sieve_word_t *vfCompositeCunningham2B = (sieve_word_t *)malloc(nCandidatesBytes);
 
-    unsigned long *vfCandidates = this->vfCandidates;
+    sieve_word_t *vfCandidates = this->vfCandidates;
 
     // Check whether fixed multiplier fits in an unsigned long
     bool fUseLongForFixedMultiplier = mpzFixedMultiplier < ULONG_MAX;
@@ -1132,19 +1132,19 @@ bool CSieveOfEratosthenes::Weave()
         {
             // Fast version
             const unsigned int nBytes = (nMaxMultiplier - nMinMultiplier + 7) / 8;
-            unsigned long *pCandidates = (unsigned long *)vfCandidates + (nMinMultiplier / nWordBits);
-            unsigned long *pCandidateBiTwin = (unsigned long *)vfCandidateBiTwin + (nMinMultiplier / nWordBits);
-            unsigned long *pCandidateCunningham1 = (unsigned long *)vfCandidateCunningham1 + (nMinMultiplier / nWordBits);
-            unsigned long *pCompositeCunningham1A = (unsigned long *)vfCompositeCunningham1A + (nMinMultiplier / nWordBits);
-            unsigned long *pCompositeCunningham1B = (unsigned long *)vfCompositeCunningham1B + (nMinMultiplier / nWordBits);
-            unsigned long *pCompositeCunningham2A = (unsigned long *)vfCompositeCunningham2A + (nMinMultiplier / nWordBits);
-            unsigned long *pCompositeCunningham2B = (unsigned long *)vfCompositeCunningham2B + (nMinMultiplier / nWordBits);
-            const unsigned int nLongs = (nBytes + sizeof(unsigned long) - 1) / sizeof(unsigned long);
-            for (unsigned int i = 0; i < nLongs; i++)
+            sieve_word_t *pCandidates = (sieve_word_t *)vfCandidates + (nMinMultiplier / nWordBits);
+            sieve_word_t *pCandidateBiTwin = (sieve_word_t *)vfCandidateBiTwin + (nMinMultiplier / nWordBits);
+            sieve_word_t *pCandidateCunningham1 = (sieve_word_t *)vfCandidateCunningham1 + (nMinMultiplier / nWordBits);
+            sieve_word_t *pCompositeCunningham1A = (sieve_word_t *)vfCompositeCunningham1A + (nMinMultiplier / nWordBits);
+            sieve_word_t *pCompositeCunningham1B = (sieve_word_t *)vfCompositeCunningham1B + (nMinMultiplier / nWordBits);
+            sieve_word_t *pCompositeCunningham2A = (sieve_word_t *)vfCompositeCunningham2A + (nMinMultiplier / nWordBits);
+            sieve_word_t *pCompositeCunningham2B = (sieve_word_t *)vfCompositeCunningham2B + (nMinMultiplier / nWordBits);
+            const unsigned int nWords = (nBytes + sizeof(sieve_word_t) - 1) / sizeof(sieve_word_t);
+            for (unsigned int i = 0; i < nWords; i++)
             {
-                const unsigned long lCompositeCunningham1 = pCompositeCunningham1A[i] | pCompositeCunningham1B[i];
-                const unsigned long lCompositeCunningham2 = pCompositeCunningham2A[i] | pCompositeCunningham2B[i];
-                const unsigned long lCompositeBiTwin = pCompositeCunningham1A[i] | pCompositeCunningham2A[i];
+                const sieve_word_t lCompositeCunningham1 = pCompositeCunningham1A[i] | pCompositeCunningham1B[i];
+                const sieve_word_t lCompositeCunningham2 = pCompositeCunningham2A[i] | pCompositeCunningham2B[i];
+                const sieve_word_t lCompositeBiTwin = pCompositeCunningham1A[i] | pCompositeCunningham2A[i];
                 pCandidateBiTwin[i] = ~lCompositeBiTwin;
                 pCandidateCunningham1[i] = ~lCompositeCunningham1;
                 pCandidates[i] = ~(lCompositeCunningham1 & lCompositeCunningham2 & lCompositeBiTwin);

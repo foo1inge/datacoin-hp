@@ -119,6 +119,8 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier);
 #define USE_ROTATE
 #endif
 
+typedef unsigned long sieve_word_t;
+
 // Sieve of Eratosthenes for proof-of-work mining
 class CSieveOfEratosthenes
 {
@@ -128,11 +130,11 @@ class CSieveOfEratosthenes
     mpz_class mpzFixedMultiplier; // fixed round multiplier
 
     // final set of candidates for probable primality checking
-    unsigned long *vfCandidates;
-    unsigned long *vfCandidateBiTwin;
-    unsigned long *vfCandidateCunningham1;
+    sieve_word_t *vfCandidates;
+    sieve_word_t *vfCandidateBiTwin;
+    sieve_word_t *vfCandidateCunningham1;
     
-    static const unsigned int nWordBits = 8 * sizeof(unsigned long);
+    static const unsigned int nWordBits = 8 * sizeof(sieve_word_t);
     unsigned int nCandidatesWords;
     unsigned int nCandidatesBytes;
 
@@ -150,16 +152,16 @@ class CSieveOfEratosthenes
         return nBitNum / nWordBits;
     }
     
-    unsigned long GetBitMask(unsigned int nBitNum) {
-        return 1UL << (nBitNum % nWordBits);
+    sieve_word_t GetBitMask(unsigned int nBitNum) {
+        return (sieve_word_t)1 << (nBitNum % nWordBits);
     }
     
     void AddMultiplier(unsigned int *vMultipliers, const unsigned int nPrimeSeq, const unsigned int nSolvedMultiplier);
 
-    void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const std::vector<unsigned int>& vPrimes, unsigned int *vMultipliers)
+    void ProcessMultiplier(sieve_word_t *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const std::vector<unsigned int>& vPrimes, unsigned int *vMultipliers)
     {
         // Wipe the part of the array first
-        memset(vfComposites + GetWordNum(nMinMultiplier), 0, (nMaxMultiplier - nMinMultiplier + nWordBits - 1) / nWordBits * sizeof(unsigned long));
+        memset(vfComposites + GetWordNum(nMinMultiplier), 0, (nMaxMultiplier - nMinMultiplier + nWordBits - 1) / nWordBits * sizeof(sieve_word_t));
 
         for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
         {
@@ -170,7 +172,7 @@ class CSieveOfEratosthenes
             {
                 unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
                 if (nVariableMultiplier == 0xFFFFFFFF) break;
-                unsigned long lBitMask = GetBitMask(nVariableMultiplier);
+                sieve_word_t lBitMask = GetBitMask(nVariableMultiplier);
                 for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
                 {
                     vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
@@ -205,10 +207,10 @@ public:
         nCandidateCount = 0;
         nCandidateMultiplier = 0;
         nCandidatesWords = (nSieveSize + nWordBits - 1) / nWordBits;
-        nCandidatesBytes = nCandidatesWords * sizeof(unsigned long);
-        vfCandidates = (unsigned long *)malloc(nCandidatesBytes);
-        vfCandidateBiTwin = (unsigned long *)malloc(nCandidatesBytes);
-        vfCandidateCunningham1 = (unsigned long *)malloc(nCandidatesBytes);
+        nCandidatesBytes = nCandidatesWords * sizeof(sieve_word_t);
+        vfCandidates = (sieve_word_t *)malloc(nCandidatesBytes);
+        vfCandidateBiTwin = (sieve_word_t *)malloc(nCandidatesBytes);
+        vfCandidateCunningham1 = (sieve_word_t *)malloc(nCandidatesBytes);
         memset(vfCandidates, 0, nCandidatesBytes);
         memset(vfCandidateBiTwin, 0, nCandidatesBytes);
         memset(vfCandidateCunningham1, 0, nCandidatesBytes);
@@ -236,10 +238,10 @@ public:
 #else
         for (unsigned int i = 0; i < nCandidatesWords; i++)
         {
-            unsigned long lBits = vfCandidates[i];
+            sieve_word_t lBits = vfCandidates[i];
             for (unsigned int j = 0; j < nWordBits; j++)
             {
-                nCandidates += (lBits & 1UL);
+                nCandidates += (lBits & 1);
                 lBits >>= 1;
             }
         }
@@ -254,7 +256,7 @@ public:
     //   False - scan complete, no more candidate and reset scan
     bool GetNextCandidateMultiplier(unsigned int& nVariableMultiplier, unsigned int& nCandidateType)
     {
-        unsigned long lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
+        sieve_word_t lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
         loop
         {
             nCandidateMultiplier++;
