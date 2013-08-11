@@ -72,6 +72,8 @@ Value setsievepercentage(const Array& params, bool fHelp)
     if (params.size() > 0)
         nPercentage = params[0].get_int();
 
+    nPercentage = std::max(std::min(nPercentage, nMaxSievePercentage), nMinSievePercentage);
+
     nSievePercentage = nPercentage;
     return Value::null;
 }
@@ -96,11 +98,42 @@ Value setroundsievepercentage(const Array& params, bool fHelp)
             "<roundsievepercentage> determines much time should be spent generating the sieve of candidate multipliers.\n"
             "The round primorial is dynamically adjusted based on this value.");
 
-    unsigned int nPercentage = nDefaultRoundSievePercentage;
+    unsigned int nPercentage = (fTestNet) ? nDefaultRoundSievePercentageTestnet : nDefaultRoundSievePercentage;
     if (params.size() > 0)
         nPercentage = params[0].get_int();
 
+    nPercentage = std::max(std::min(nPercentage, nMaxRoundSievePercentage), nMinRoundSievePercentage);
+
     nRoundSievePercentage = nPercentage;
+    return Value::null;
+}
+
+
+Value getsieveextensions(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getsieveextensions\n"
+            "Returns the number of times the sieve is extended.");
+
+    return (boost::int64_t)nRoundSievePercentage;
+}
+
+
+Value setsieveextensions(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1)
+        throw runtime_error(
+            "setsieveextensions <sieveextensions>\n"
+            "<sieveextensions> determines the number of times the sieve will be extended.");
+
+    unsigned int nExtensions = (fTestNet) ? nDefaultSieveExtensionsTestnet : nDefaultSieveExtensions;
+    if (params.size() > 0)
+        nExtensions = params[0].get_int();
+
+    nExtensions = std::max(std::min(nExtensions, nMaxSieveExtensions), nMinSieveExtensions);
+
+    nSieveExtensions = nExtensions;
     return Value::null;
 }
 
@@ -150,6 +183,7 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("roundsievepercentage",(int)nRoundSievePercentage));
     obj.push_back(Pair("primespersec",  getprimespersec(params, false)));
     obj.push_back(Pair("pooledtx",      (uint64_t)mempool.size()));
+    obj.push_back(Pair("sieveextensions",(int)nSieveExtensions));
     obj.push_back(Pair("sievepercentage",(int)nSievePercentage));
     obj.push_back(Pair("sievesize",     (int)nSieveSize));
     obj.push_back(Pair("testnet",       fTestNet));
