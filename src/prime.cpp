@@ -514,9 +514,6 @@ unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned i
 /* PRIMECOIN MINING */
 /********************/
 
-// Number of primes to test with fast divisibility testing
-static const unsigned int nFastDivPrimes = 60;
-
 class CPrimalityTestParams
 {
 public:
@@ -529,11 +526,6 @@ public:
     mpz_class mpzOriginMinusOne;
     mpz_class mpzOriginPlusOne;
     mpz_class N;
-
-    // Big divisors for fast div test
-    std::vector<unsigned long> vFastDivisors;
-    std::vector<unsigned int> vFastDivSeq;
-    unsigned int nFastDivisorsSize;
 
     // Values specific to a round
     unsigned int nBits;
@@ -564,30 +556,11 @@ public:
 // Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
 // true: n is probable prime
 // false: n is composite; set fractional length in the nLength output
-static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastDiv = false, bool fFastFail = false)
+static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastFail = false)
 {
     // Faster GMP version
     mpz_t& mpzE = testParams.mpzE;
     mpz_t& mpzR = testParams.mpzR;
-
-    if (fFastDiv)
-    {
-        // Fast divisibility tests
-        // Divide n by a large divisor
-        // Use the remainder to test divisibility by small primes
-        const unsigned int nDivSize = testParams.nFastDivisorsSize;
-        for (unsigned int i = 0; i < nDivSize; i++)
-        {
-            unsigned long lRemainder = mpz_tdiv_ui(n.get_mpz_t(), testParams.vFastDivisors[i]);
-            unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
-            const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
-            for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
-            {
-                if (lRemainder % vPrimes[nPrimeSeq] == 0)
-                    return false; // returning here skips the fractional length calculation!
-            }
-        }
-    }
 
     mpz_sub_ui(mpzE, n.get_mpz_t(), 1);
     mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, n.get_mpz_t());
@@ -674,7 +647,7 @@ static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGerm
     nProbableChainLength = 0;
 
     // Fermat test for n first
-    if (!FermatProbablePrimalityTestFast(n, nProbableChainLength, testParams, true, true))
+    if (!FermatProbablePrimalityTestFast(n, nProbableChainLength, testParams, true))
         return false;
 
     // Euler-Lagrange-Lifchitz test for the following numbers in chain
@@ -790,35 +763,6 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
 
     // Allocate GMP variables for primality tests
     CPrimalityTestParams testParams(nBits, nPrimorialSeq);
-
-    // Compute parameters for fast div test
-    {
-        unsigned long lDivisor = 1;
-        unsigned int i;
-        testParams.vFastDivSeq.push_back(nPrimorialSeq);
-        for (i = 1; i <= nFastDivPrimes; i++)
-        {
-            // Multiply primes together until the result won't fit an unsigned long
-            if (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
-                lDivisor *= vPrimes[nPrimorialSeq + i];
-            else
-            {
-                testParams.vFastDivisors.push_back(lDivisor);
-                testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
-                lDivisor = 1;
-            }
-        }
-
-        // Finish off by multiplying as many primes as possible
-        while (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
-        {
-            lDivisor *= vPrimes[nPrimorialSeq + i];
-            i++;
-        }
-        testParams.vFastDivisors.push_back(lDivisor);
-        testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
-        testParams.nFastDivisorsSize = testParams.vFastDivisors.size();
-    }
 
     nStart = GetTimeMicros();
     
