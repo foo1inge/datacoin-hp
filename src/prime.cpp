@@ -998,7 +998,7 @@ bool CSieveOfEratosthenes::Weave()
 
     // Number of elements that are likely to fit in L1 cache
     // NOTE: This needs to be a multiple of nWordBits
-    const unsigned int nL1CacheElements = 200000;
+    const unsigned int nL1CacheElements = 224000;
     const unsigned int nArrayRounds = (nSieveSize + nL1CacheElements - 1) / nL1CacheElements;
 
     // Calculate the number of CC1 and CC2 layers needed for BiTwin candidates
