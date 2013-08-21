@@ -13,7 +13,6 @@
 std::vector<unsigned int> vPrimes;
 unsigned int nSieveSize = nDefaultSieveSize;
 unsigned int nSievePercentage = nDefaultSievePercentage;
-unsigned int nRoundSievePercentage = nDefaultRoundSievePercentage;
 unsigned int nSieveExtensions = nDefaultSieveExtensions;
 
 static unsigned int int_invert(unsigned int a, unsigned int nPrime);
@@ -23,14 +22,11 @@ void GeneratePrimeTable()
     const unsigned int nDefaultSieveExt = (fTestNet) ? nDefaultSieveExtensionsTestnet : nDefaultSieveExtensions;
     nSieveExtensions = (unsigned int)GetArg("-sieveextensions", nDefaultSieveExt);
     nSieveExtensions = std::max(std::min(nSieveExtensions, nMaxSieveExtensions), nMinSieveExtensions);
-    const unsigned int nDefaultRSPercentage = (fTestNet) ? nDefaultRoundSievePercentageTestnet : nDefaultRoundSievePercentage;
-    nRoundSievePercentage = (unsigned int)GetArg("-roundsievepercentage", nDefaultRSPercentage);
-    nRoundSievePercentage = std::max(std::min(nRoundSievePercentage, nMaxRoundSievePercentage), nMinRoundSievePercentage);
     nSievePercentage = (unsigned int)GetArg("-sievepercentage", nDefaultSievePercentage);
     nSievePercentage = std::max(std::min(nSievePercentage, nMaxSievePercentage), nMinSievePercentage);
     nSieveSize = (unsigned int)GetArg("-sievesize", nDefaultSieveSize);
     nSieveSize = std::max(std::min(nSieveSize, nMaxSieveSize), nMinSieveSize);
-    printf("GeneratePrimeTable() : setting nSieveExtensions = %u, nRoundSievePercentage = %u, nSievePercentage = %u, nSieveSize = %u\n", nSieveExtensions, nRoundSievePercentage, nSievePercentage, nSieveSize);
+    printf("GeneratePrimeTable() : setting nSieveExtensions = %u, nSievePercentage = %u, nSieveSize = %u\n", nSieveExtensions, nSievePercentage, nSieveSize);
     const unsigned nPrimeTableLimit = nSieveSize;
     vPrimes.clear();
     // Generate prime table using sieve of Eratosthenes
