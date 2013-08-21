@@ -878,11 +878,11 @@ void CSieveOfEratosthenes::ProcessMultiplier(sieve_word_t *vfComposites, const u
     for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
     {
         const unsigned int nPrime = vPrimes[nPrimeSeq];
-#ifdef USE_ROTATE
-        const unsigned int nRotateBits = nPrime % nWordBits;
         unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq];
         if (nVariableMultiplier < nMinMultiplier)
             nVariableMultiplier += (nMinMultiplier - nVariableMultiplier + nPrime - 1) / nPrime * nPrime;
+#ifdef USE_ROTATE
+        const unsigned int nRotateBits = nPrime % nWordBits;
         sieve_word_t lBitMask = GetBitMask(nVariableMultiplier);
         for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
         {
@@ -891,7 +891,6 @@ void CSieveOfEratosthenes::ProcessMultiplier(sieve_word_t *vfComposites, const u
         }
         vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq] = nVariableMultiplier;
 #else
-        unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq];
         for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
         {
             vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
