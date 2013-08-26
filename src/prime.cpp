@@ -1159,11 +1159,11 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier, unsi
     for (unsigned int i = 0; vPrimes[i] <= nPrimorialHashFactor; i++)
         dFixedMultiplier /= vPrimes[i];
 
-    double dExtendedSieveWeightedSum = nSieveSize * 1.0;
+    double dExtendedSieveWeightedSum = 0.5 * nSieveSize;
     double dExtendedSieveCandidates = nSieveSize;
     for (unsigned int i = 0; i < nSieveExtensions; i++)
     {
-        dExtendedSieveWeightedSum += nSieveSize / 2 * (2 << i);
+        dExtendedSieveWeightedSum += 0.75 * (nSieveSize * (2 << i));
         dExtendedSieveCandidates += nSieveSize / 2;
     }
     const double dExtendedSieveAverageMultiplier = dExtendedSieveWeightedSum / dExtendedSieveCandidates;
