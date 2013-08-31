@@ -772,7 +772,6 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
     // Process a part of the candidates
     while (nTests < nTestsAtOnce && pindexPrev == pindexBest)
     {
-        nTests++;
         if (!lpsieve->GetNextCandidateMultiplier(nTriedMultiplier, nCandidateType))
         {
             // power tests completed for the sieve
@@ -782,6 +781,7 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
             fNewBlock = true; // notify caller to change nonce
             return false;
         }
+        nTests++;
         mpzChainOrigin = mpzHashMultiplier * nTriedMultiplier;
         nChainLength = 0;
         if (ProbablePrimeChainTestFast(mpzChainOrigin, testParams))
