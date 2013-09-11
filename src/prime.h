@@ -18,7 +18,7 @@
 extern std::vector<unsigned int> vPrimes;
 static const unsigned int nMaxSieveExtensions = 20;
 static const unsigned int nMinSieveExtensions = 0;
-static const unsigned int nDefaultSieveExtensions = 6;
+static const unsigned int nDefaultSieveExtensions = 9;
 static const unsigned int nDefaultSieveExtensionsTestnet = 4;
 extern unsigned int nSieveExtensions;
 static const unsigned int nMaxSievePercentage = 100;
