@@ -1036,7 +1036,7 @@ bool CSieveOfEratosthenes::Weave()
             // Apply the layer to the primary sieve arrays
             if (nLayerSeq < nChainLength)
             {
-                if (nLayerSeq < nBiTwinCC1Layers && nLayerSeq < nBiTwinCC2Layers)
+                if (nLayerSeq < nBiTwinCC2Layers)
                 {
                     for (unsigned int nWord = nMinWord; nWord < nMaxWord; nWord++)
                     {
@@ -1074,7 +1074,7 @@ bool CSieveOfEratosthenes::Weave()
                     sieve_word_t *vfExtCC1 = vfExtendedCompositeCunningham1 + nExtensionSeq * nCandidatesWords;
                     sieve_word_t *vfExtCC2 = vfExtendedCompositeCunningham2 + nExtensionSeq * nCandidatesWords;
                     sieve_word_t *vfExtTWN = vfExtendedCompositeBiTwin + nExtensionSeq * nCandidatesWords;
-                    if (nLayerExtendedSeq < nBiTwinCC1Layers && nLayerExtendedSeq < nBiTwinCC2Layers)
+                    if (nLayerExtendedSeq < nBiTwinCC2Layers)
                     {
                         for (unsigned int nWord = nExtMinWord; nWord < nMaxWord; nWord++)
                         {
