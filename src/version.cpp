@@ -15,7 +15,7 @@ const std::string CLIENT_NAME("Satoshi");
 #define CLIENT_VERSION_SUFFIX   "-beta"
 
 // Special version string
-#define SPECIAL_VERSION_STR     "xpm-hp10"
+#define SPECIAL_VERSION_STR     "xpm-hp11"
 
 
 // The following part of the code determines the CLIENT_BUILD variable.
