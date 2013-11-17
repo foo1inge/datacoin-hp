@@ -67,7 +67,7 @@ map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
 // Constant stuff for coinbase transactions we create:
 CScript COINBASE_FLAGS;
 
-const string strMessageMagic = "Primecoin Signed Message:\n";
+const string strMessageMagic = "Datacoin Signed Message:\n";
 
 double dPrimesPerSec = 0.0;
 double dChainsPerMinute = 0.0;
@@ -2045,25 +2045,6 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
     if (vtx.empty() || vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
         return state.DoS(100, error("CheckBlock() : size limits failed"));
 
-    // Special short-term limits to avoid 10,000 BDB lock limit:
-    if (GetBlockTime() >= 1363867200 && // start enforcing 21 March 2013, noon GMT
-        GetBlockTime() < 1368576000)  // stop enforcing 15 May 2013 00:00:00
-    {
-        // Rule is: #unique txids referenced <= 4,500
-        // ... to prevent 10,000 BDB lock exhaustion on old clients
-        set<uint256> setTxIn;
-        for (size_t i = 0; i < vtx.size(); i++)
-        {
-            setTxIn.insert(vtx[i].GetHash());
-            if (i == 0) continue; // skip coinbase txin
-            BOOST_FOREACH(const CTxIn& txin, vtx[i].vin)
-                setTxIn.insert(txin.prevout.hash);
-        }
-        size_t nTxids = setTxIn.size();
-        if (nTxids > 4500)
-            return error("CheckBlock() : 15 May maxlocks violation");
-    }
-
     // Primecoin: proof of work is checked in ProcessBlock()
 
     // Check timestamp
@@ -2722,10 +2703,10 @@ bool LoadBlockIndex()
 {
     if (fTestNet)
     {
-        pchMessageStart[0] = 0xfb;
-        pchMessageStart[1] = 0xfe;
-        pchMessageStart[2] = 0xcb;
-        pchMessageStart[3] = 0xc3;
+        pchMessageStart[0] = 0xdb;
+        pchMessageStart[1] = 0xde;
+        pchMessageStart[2] = 0xdb;
+        pchMessageStart[3] = 0xd3;
         hashGenesisBlock = hashGenesisBlockTestNet;
         nTargetInitialLength = 5; // primecoin: initial prime chain target
         nTargetMinLength = 2;     // primecoin: minimum prime chain target
@@ -2750,7 +2731,7 @@ bool InitBlockIndex() {
         return true;
 
     // Use the provided setting for -txindex in the new database
-    fTxIndex = GetBoolArg("-txindex", false);
+    fTxIndex = GetBoolArg("-txindex", true);
     pblocktree->WriteFlag("txindex", fTxIndex);
     printf("Initializing databases...\n");
 
@@ -2764,21 +2745,21 @@ bool InitBlockIndex() {
         //   vMerkleTree: 4a5e1e
 
         // Genesis block
-        const char* pszDedication = "Sunny King - dedicated to Satoshi Nakamoto and all who have fought for the freedom of mankind";
+        const char* pszStartTopic = "https://bitcointalk.org/index.php?topic=325735.0";
         CTransaction txNew;
         txNew.vin.resize(1);
         txNew.vout.resize(1);
-        txNew.vin[0].scriptSig = CScript() << 0 << CBigNum(999) << vector<unsigned char>((const unsigned char*)pszDedication, (const unsigned char*)pszDedication + strlen(pszDedication));
+        txNew.vin[0].scriptSig = CScript() << 0 << CBigNum(999) << vector<unsigned char>((const unsigned char*)pszStartTopic, (const unsigned char*)pszStartTopic + strlen(pszStartTopic));
         txNew.vout[0].nValue = COIN;
         txNew.vout[0].scriptPubKey = CScript();
         CBlock block;
         block.vtx.push_back(txNew);
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
-        block.nTime    = 1373064429;
+        block.nTime    = 1384627170;
         block.nBits    = TargetFromInt(6);
-        block.nNonce   = 383;
-        block.bnPrimeChainMultiplier = ((uint64) 532541) * (uint64)(2 * 3 * 5 * 7 * 11 * 13 * 17 * 19 * 23);
+        block.nNonce   = 49030125;
+        block.bnPrimeChainMultiplier = (uint64) 5651310;
 
         if (fTestNet)
         {
@@ -2786,14 +2767,15 @@ bool InitBlockIndex() {
             block.nNonce   = 1513;
             block.bnPrimeChainMultiplier = ((uint64) 585641) * (uint64)(2 * 3 * 5 * 7 * 11 * 13 * 17 * 19 * 23);
         }
-
+ 
         //// debug print
         uint256 hash = block.GetHash();
         printf("%s\n", hash.ToString().c_str());
         printf("%s\n", hashGenesisBlock.ToString().c_str());
         printf("%s\n", block.hashMerkleRoot.ToString().c_str());
-        assert(block.hashMerkleRoot == uint256("0xaca30eb61dffbb9412d0ae743c3d74554f710853daec40ebd2514e830e05c9ff"));
+        assert(block.hashMerkleRoot == uint256("0xfe5d7082c24c53362f6b82211913d536677aaffafde0dcec6ff7b348ff6265f8"));
         block.print();
+
         assert(hash == hashGenesisBlock);
         {
             CValidationState state;
@@ -3092,7 +3074,7 @@ bool static AlreadyHave(const CInv& inv)
 // The message start string is designed to be unlikely to occur in normal data.
 // The characters are rarely used upper ASCII, not valid as UTF-8, and produce
 // a large 4-byte int at any alignment.
-unsigned char pchMessageStart[4] = { 0xe4, 0xe7, 0xe5, 0xe7 };
+unsigned char pchMessageStart[4] = { 0xda, 0xdc, 0xdd, 0xed };
 
 
 void static ProcessGetData(CNode* pfrom)
@@ -4534,10 +4516,10 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
     CBigNum bnTarget = CBigNum().SetCompact(pblock->nBits);
 
     if (!CheckProofOfWork(pblock->GetHeaderHash(), pblock->nBits, pblock->bnPrimeChainMultiplier, pblock->nPrimeChainType, pblock->nPrimeChainLength))
-        return error("PrimecoinMiner : failed proof-of-work check");
+        return error("DatacoinMiner : failed proof-of-work check");
 
     //// debug print
-    printf("PrimecoinMiner:\n");
+    printf("DatacoinMiner:\n");
     printf("proof-of-work found  \n  target: %s\n  multiplier: %s\n  ", TargetToString(pblock->nBits).c_str(), pblock->bnPrimeChainMultiplier.GetHex().c_str());
     pblock->print();
     printf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue).c_str());
@@ -4546,7 +4528,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
     {
         LOCK(cs_main);
         if (pblock->hashPrevBlock != hashBestChain)
-            return error("PrimecoinMiner : generated block is stale");
+            return error("DatacoinMiner : generated block is stale");
 
         // Remove key from key pool
         reservekey.KeepKey();
@@ -4560,7 +4542,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
         // Process this block the same as if we had received it from another node
         CValidationState state;
         if (!ProcessBlock(state, NULL, pblock))
-            return error("PrimecoinMiner : ProcessBlock, block not accepted");
+            return error("DatacoinMiner : ProcessBlock, block not accepted");
     }
 
     return true;
@@ -4568,9 +4550,9 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 
 void static BitcoinMiner(CWallet *pwallet)
 {
-    printf("PrimecoinMiner started\n");
+    printf("DatacoinMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
-    RenameThread("primecoin-miner");
+    RenameThread("datacoin-miner");
 
     // Each thread has its own key and counter
     CReserveKey reservekey(pwallet);
@@ -4604,7 +4586,7 @@ void static BitcoinMiner(CWallet *pwallet)
         IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
 
         if (fDebug && GetBoolArg("-printmining"))
-            printf("Running PrimecoinMiner with %"PRIszu" transactions in block (%u bytes)\n", pblock->vtx.size(),
+            printf("Running DatacoinMiner with %"PRIszu" transactions in block (%u bytes)\n", pblock->vtx.size(),
                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
 
         //
@@ -4662,7 +4644,7 @@ void static BitcoinMiner(CWallet *pwallet)
             while (mpzPrimorial < mpzMultiplierMin)
             {
                 if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
-                    error("PrimecoinMiner() : primorial minimum overflow");
+                    error("DatacoinMiner() : primorial minimum overflow");
                 Primorial(nPrimorialMultiplier, mpzPrimorial);
             }
             mpz_class mpzFixedMultiplier;
@@ -4772,7 +4754,7 @@ void static BitcoinMiner(CWallet *pwallet)
                     double dPrimeProbabilityBegin = EstimateCandidatePrimeProbability(nPrimorialMultiplier, 0);
                     unsigned int nTargetLength = TargetGetLength(pblock->nBits);
                     double dPrimeProbabilityEnd = EstimateCandidatePrimeProbability(nPrimorialMultiplier, nTargetLength - 1);
-                    printf("PrimecoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus pprob=%1.6f pprob2=%1.6f tochain=%6.3fd expect=%3.9f\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, dPrimeProbabilityBegin, dPrimeProbabilityEnd, ((dTimeExpected/1000000.0))/86400.0, dRoundChainExpected);
+                    printf("DatacoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus pprob=%1.6f pprob2=%1.6f tochain=%6.3fd expect=%3.9f\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, dPrimeProbabilityBegin, dPrimeProbabilityEnd, ((dTimeExpected/1000000.0))/86400.0, dRoundChainExpected);
                 }
 
                 // Primecoin: update time and nonce
@@ -4819,12 +4801,12 @@ void static BitcoinMiner(CWallet *pwallet)
                 if (fIncrementPrimorial)
                 {
                     if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
-                        error("PrimecoinMiner() : primorial increment overflow");
+                        error("DatacoinMiner() : primorial increment overflow");
                 }
                 else if (nPrimorialMultiplier > nPrimorialHashFactor)
                 {
                     if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
-                        error("PrimecoinMiner() : primorial decrement overflow");
+                        error("DatacoinMiner() : primorial decrement overflow");
                 }
                 Primorial(nPrimorialMultiplier, mpzPrimorial);
             }
@@ -4833,7 +4815,7 @@ void static BitcoinMiner(CWallet *pwallet)
     } }
     catch (boost::thread_interrupted)
     {
-        printf("PrimecoinMiner terminated\n");
+        printf("DatacoinMiner terminated\n");
         throw;
     }
 }

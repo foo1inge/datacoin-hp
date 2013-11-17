@@ -16,10 +16,10 @@
 #include <string>
 #include "uint256.h"
 
-#define PRIMECOIN_PORT   9911
-#define RPC_PORT         9912
-#define TESTNET_PORT     9913
-#define TESTNET_RPC_PORT 9914
+#define PRIMECOIN_PORT   4777
+#define RPC_PORT         11777 
+#define TESTNET_PORT     4776
+#define TESTNET_RPC_PORT 11776
 
 extern bool fTestNet;
 
