@@ -1,3 +1,9 @@
+datacoin-hp
+===========
+
+High-performance version of datacoin (primecoin-hp fork).
+
+
 Primecoin High Performance Version
 ==================================
 
@@ -102,3 +108,8 @@ Large changes should have a test plan, and should be tested by somebody other
 than the developer who wrote the code.
 
 See https://github.com/bitcoin/QA/ for how to create a test plan.
+=======
+datacoin-hp
+===========
+
+High-performance version of datacoin (primecoin-hp fork)
