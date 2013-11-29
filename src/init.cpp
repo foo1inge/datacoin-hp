@@ -793,6 +793,11 @@ bool AppInit2(boost::thread_group& threadGroup)
     BOOST_FOREACH(string strDest, mapMultiArgs["-seednode"])
         AddOneShot(strDest);
 
+    // hardcoded seednode
+    AddOneShot("5.9.247.87");
+    AddOneShot("108.61.57.80");
+    AddOneShot("78.46.250.58");
+
     // ********************************************************* Step 7: load block chain
 
     fReindex = GetBoolArg("-reindex");
