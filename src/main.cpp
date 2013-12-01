@@ -551,8 +551,8 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     // Basic checks that don't depend on any context
     if (vin.empty())
         return state.DoS(10, error("CTransaction::CheckTransaction() : vin empty"));
-    if (vout.empty())
-        return state.DoS(10, error("CTransaction::CheckTransaction() : vout empty"));
+    if (vout.empty() && 0 == data.size())
+        return state.DoS(10, error("CTransaction::CheckTransaction() : vout empty and 0 == data.size()"));
     // Size limits
     if (::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
         return state.DoS(100, error("CTransaction::CheckTransaction() : size limits failed"));
@@ -829,7 +829,7 @@ bool CTransaction::AcceptToMemoryPool(CValidationState &state, bool fCheckInputs
     }
 }
 
-bool CTxMemPool::addUnchecked(const uint256& hash, CTransaction &tx)
+bool CTxMemPool::addUnchecked(const uint256& hash, const CTransaction &tx)
 {
     // Add to memory pool without checking anything.  Don't call this directly,
     // call CTxMemPool::accept to properly check the transaction first.
@@ -1526,7 +1526,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
 void ThreadScriptCheck() {
-    RenameThread("primecoin-scriptch");
+    RenameThread("datacoin-scriptch");
     scriptcheckqueue.Thread();
 }
 
@@ -2731,7 +2731,7 @@ bool InitBlockIndex() {
         return true;
 
     // Use the provided setting for -txindex in the new database
-    fTxIndex = GetBoolArg("-txindex", true);
+    fTxIndex = GetBoolArg("-txindex", true); // in datacoin by default we need txIndex
     pblocktree->WriteFlag("txindex", fTxIndex);
     printf("Initializing databases...\n");
 

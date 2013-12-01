@@ -42,6 +42,7 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex)
     result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
     result.push_back(Pair("height", blockindex->nHeight));
     result.push_back(Pair("version", block.nVersion));
+    result.push_back(Pair("headerhash", block.GetHeaderHash().GetHex()));
     result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
     Array txs;
     BOOST_FOREACH(const CTransaction&tx, block.vtx)
@@ -223,7 +224,7 @@ Value listprimerecords(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
             "listprimerecords <primechain length> [primechain type]\n"
-            "Returns the list of record prime chains in primecoin network.\n"
+            "Returns the list of record prime chains in datacoin network.\n"
             "<primechain length> is integer like 10, 11, 12 etc.\n"
             "[primechain type] is optional type, among 1CC, 2CC and TWN");
 
@@ -284,7 +285,7 @@ Value listtopprimes(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
             "listtopprimes <primechain length> [primechain type]\n"
-            "Returns the list of top prime chains in primecoin network.\n"
+            "Returns the list of top prime chains in datacoin network.\n"
             "<primechain length> is integer like 10, 11, 12 etc.\n"
             "[primechain type] is optional type, among 1CC, 2CC and TWN");
 

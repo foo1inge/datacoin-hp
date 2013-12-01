@@ -98,7 +98,7 @@ OBJS= \
     obj/prime.o \
     obj/checkpointsync.o
 
-all: primecoind.exe
+all: datacoind.exe
 
 DEFS += -I"$(CURDIR)/leveldb/include"
 DEFS += -I"$(CURDIR)/leveldb/helpers"
@@ -113,7 +113,7 @@ DEFS += -DHAVE_BUILD_INFO
 obj/%.o: %.cpp $(HEADERS)
 	$(CXX) -c $(xCXXFLAGS) -o $@ $<
 
-primecoind.exe: $(OBJS:obj/%=obj/%)
+datacoind.exe: $(OBJS:obj/%=obj/%)
 	$(CXX) $(xCXXFLAGS) $(xLDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
@@ -127,7 +127,7 @@ test_primecoin.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
 
 clean:
 	-rm -f obj/*.o
-	-rm -f primecoind.exe
+	-rm -f datacoind.exe
 	-rm -f obj-test/*.o
 	-rm -f test_primecoin.exe
 	-rm -f obj/build.h
