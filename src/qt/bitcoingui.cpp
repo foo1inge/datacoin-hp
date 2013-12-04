@@ -70,8 +70,8 @@ BitcoinGUI::BitcoinGUI(QWidget *parent) :
     restoreWindowGeometry();
     setWindowTitle(tr("Datacoin") + " - " + tr("Wallet"));
 #ifndef Q_OS_MAC
-    QApplication::setWindowIcon(QIcon(":icons/primecoin"));
-    setWindowIcon(QIcon(":icons/primecoin"));
+    QApplication::setWindowIcon(QIcon(":icons/datacoin"));
+    setWindowIcon(QIcon(":icons/datacoin"));
 #else
     setUnifiedTitleAndToolBarOnMac(true);
     QApplication::setAttribute(Qt::AA_DontShowIconsInMenus);
@@ -212,7 +212,7 @@ void BitcoinGUI::createActions()
     quitAction->setStatusTip(tr("Quit application"));
     quitAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q));
     quitAction->setMenuRole(QAction::QuitRole);
-    aboutAction = new QAction(QIcon(":/icons/primecoin"), tr("&About Datacoin"), this);
+    aboutAction = new QAction(QIcon(":/icons/datacoin"), tr("&About Datacoin"), this);
     aboutAction->setStatusTip(tr("Show information about Datacoin"));
     aboutAction->setMenuRole(QAction::AboutRole);
     aboutQtAction = new QAction(QIcon(":/trolltech/qmessagebox/images/qtlogo-64.png"), tr("About &Qt"), this);
@@ -221,7 +221,7 @@ void BitcoinGUI::createActions()
     optionsAction = new QAction(QIcon(":/icons/options"), tr("&Options..."), this);
     optionsAction->setStatusTip(tr("Modify configuration options for Datacoin"));
     optionsAction->setMenuRole(QAction::PreferencesRole);
-    toggleHideAction = new QAction(QIcon(":/icons/primecoin"), tr("&Show / Hide"), this);
+    toggleHideAction = new QAction(QIcon(":/icons/datacoin"), tr("&Show / Hide"), this);
     toggleHideAction->setStatusTip(tr("Show or hide the main Window"));
 
     encryptWalletAction = new QAction(QIcon(":/icons/lock_closed"), tr("&Encrypt Wallet..."), this);
@@ -303,10 +303,10 @@ void BitcoinGUI::setClientModel(ClientModel *clientModel)
         {
             setWindowTitle(windowTitle() + QString(" ") + tr("[testnet]"));
 #ifndef Q_OS_MAC
-            QApplication::setWindowIcon(QIcon(":icons/primecoin_testnet"));
-            setWindowIcon(QIcon(":icons/primecoin_testnet"));
+            QApplication::setWindowIcon(QIcon(":icons/datacoin_testnet"));
+            setWindowIcon(QIcon(":icons/datacoin_testnet"));
 #else
-            MacDockIconHandler::instance()->setIcon(QIcon(":icons/primecoin_testnet"));
+            MacDockIconHandler::instance()->setIcon(QIcon(":icons/datacoin_testnet"));
 #endif
             if(trayIcon)
             {
