@@ -61,6 +61,12 @@ public:
     int getNumTransactions() const;
     EncryptionStatus getEncryptionStatus() const;
 
+    // Mining
+    void setMining(size_t threads);
+    bool getMining();
+    double getDifficulty();
+    int getBlockCount();
+
     // Check address for validity
     bool validateAddress(const QString &address);
 

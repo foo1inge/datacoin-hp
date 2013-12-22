@@ -9,6 +9,7 @@
 #include "transactiontablemodel.h"
 #include "addressbookpage.h"
 #include "sendcoinsdialog.h"
+#include "forms/miningdialog.h"
 #include "signverifymessagedialog.h"
 #include "clientmodel.h"
 #include "walletmodel.h"
@@ -55,6 +56,8 @@ WalletView::WalletView(QWidget *parent, BitcoinGUI *_gui):
 
     sendCoinsPage = new SendCoinsDialog(gui);
 
+    miningPage = new MiningDialog(gui);
+
     signVerifyMessageDialog = new SignVerifyMessageDialog(gui);
 
     addWidget(overviewPage);
@@ -62,6 +65,7 @@ WalletView::WalletView(QWidget *parent, BitcoinGUI *_gui):
     addWidget(addressBookPage);
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
+    addWidget(miningPage);
 
     // Clicking on a transaction on the overview page simply sends you to transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), this, SLOT(gotoHistoryPage()));
@@ -117,6 +121,7 @@ void WalletView::setWalletModel(WalletModel *walletModel)
         receiveCoinsPage->setModel(walletModel->getAddressTableModel());
         sendCoinsPage->setModel(walletModel);
         signVerifyMessageDialog->setModel(walletModel);
+        miningPage->setModel(walletModel);
 
         setEncryptionStatus();
         connect(walletModel, SIGNAL(encryptionStatusChanged(int)), gui, SLOT(setEncryptionStatus(int)));
@@ -162,6 +167,12 @@ void WalletView::gotoAddressBookPage()
 {
     gui->getAddressBookAction()->setChecked(true);
     setCurrentWidget(addressBookPage);
+}
+
+void WalletView::gotoMiningPage()
+{
+    gui->getMiningAction()->setChecked(true);
+    setCurrentWidget(miningPage);
 }
 
 void WalletView::gotoReceiveCoinsPage()

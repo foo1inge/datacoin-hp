@@ -249,6 +249,11 @@ inline std::string itostr(int n)
     return strprintf("%d", n);
 }
 
+inline std::string dtostr(double d)
+{
+    return strprintf("%f", d);
+}
+
 inline int64 atoi64(const char* psz)
 {
 #ifdef _MSC_VER

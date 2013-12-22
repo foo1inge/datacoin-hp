@@ -302,6 +302,28 @@ bool WalletModel::backupWallet(const QString &filename)
     return BackupWallet(*wallet, filename.toLocal8Bit().data());
 }
 
+void WalletModel::setMining(size_t threads) {
+    mapArgs["-genproclimit"] = itostr(threads);
+    mapArgs["-gen"] = (threads > 0 ? "1" : "0");
+    GenerateBitcoins(true, wallet);
+}
+
+bool WalletModel::getMining() {
+    return "1" == mapArgs["-gen"];
+}
+
+double GetDifficulty(const CBlockIndex* blockindex);
+
+double WalletModel::getDifficulty() {
+    return GetDifficulty(NULL);
+}
+
+extern int nBestHeight;
+
+int WalletModel::getBlockCount() {
+    return nBestHeight;
+}
+
 // Handlers for core signals
 static void NotifyKeyStoreStatusChanged(WalletModel *walletmodel, CCryptoKeyStore *wallet)
 {

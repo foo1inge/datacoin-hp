@@ -67,6 +67,7 @@ public:
     QAction * getAddressBookAction() { return addressBookAction; }
     QAction * getReceiveCoinsAction() { return receiveCoinsAction; }
     QAction * getSendCoinsAction() { return sendCoinsAction; }
+    QAction * getMiningAction() { return miningAction; }
 
 protected:
     void changeEvent(QEvent *e);
@@ -91,6 +92,7 @@ private:
     QAction *quitAction;
     QAction *sendCoinsAction;
     QAction *addressBookAction;
+    QAction *miningAction;
     QAction *signMessageAction;
     QAction *verifyMessageAction;
     QAction *aboutAction;
@@ -168,6 +170,8 @@ private slots:
     /** Switch to address book page */
     void gotoAddressBookPage();
     /** Switch to receive coins page */
+    void gotoMiningPage();
+    /** Switch to mining page */
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
     void gotoSendCoinsPage(QString addr = "");

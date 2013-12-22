@@ -105,6 +105,13 @@ void WalletStack::gotoSendCoinsPage(QString addr)
         i.value()->gotoSendCoinsPage(addr);
 }
 
+void WalletStack::gotoMiningPage()
+{
+    QMap<QString, WalletView*>::const_iterator i;
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+        i.value()->gotoMiningPage();
+}
+
 void WalletStack::gotoSignMessageTab(QString addr)
 {
     WalletView *walletView = (WalletView*)currentWidget();
