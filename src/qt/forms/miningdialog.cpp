@@ -81,11 +81,13 @@ extern double dChainsPerDay;
 
 void setValueToCell(QTableWidget &table, int row, int col, std::string value) {
     QTableWidgetItem *item = table.item(row, col);
-    if (NULL == item) item = new QTableWidgetItem;
+    if (NULL == item) {
+        item = new QTableWidgetItem;
+        table.setItem(row, col, item);
+    }
     item->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     item->setText(value.c_str());
     item->setFlags(item->flags() & ~Qt::ItemIsEditable & ~Qt::ItemIsSelectable);
-    table.setItem(row, col, item);
 }
 
 void setValueToCell(QTableWidget &table, int row, int col, double value) {
