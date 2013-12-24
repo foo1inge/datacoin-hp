@@ -317,6 +317,26 @@ Value senddata(const Array& params, bool fHelp)
     return wtx.GetHash().GetHex();
 }
 
+Value getdata(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "getdata <hash>\n"
+            "Returns base64 data from a given tx-hash.");
+
+    std::string strHash = params[0].get_str();
+    uint256 hash(strHash);
+
+    CTransaction tx;
+    uint256 hashBlock = 0;
+    if (!GetTransaction(hash, tx, hashBlock, true))
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available about transaction");
+
+    string data = tx.GetBase64Data();
+
+    return data;
+}
+
 Value listaddressgroupings(const Array& params, bool fHelp)
 {
     if (fHelp)
