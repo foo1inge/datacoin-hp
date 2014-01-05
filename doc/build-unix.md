@@ -51,7 +51,7 @@ Licenses of statically linked libraries:
 -  Boost         1.37
 -  miniupnpc     1.6
 
-Dependency Build Instructions: Ubuntu & Debian
+Dependency Build Instructions: Ubuntu, Debian & Gentoo
 ----------------------------------------------
 Build requirements:
 
@@ -66,6 +66,10 @@ for Ubuntu 12.04:
 
  Ubuntu precise has packages for libdb5.1-dev and libdb5.1++-dev,
  but using these will break binary wallet compatibility, and is not recommended.
+ 
+for Gentoo:
+
+	emerge datacoin-hp
 
 for other Ubuntu & Debian:
 
@@ -77,22 +81,6 @@ for other Ubuntu & Debian:
 Optional:
 
 	sudo apt-get install libminiupnpc-dev (see USE_UPNP compile flag)
-
-
-Dependency Build Instructions: Gentoo
--------------------------------------
-
-Note: If you just want to install bitcoind on Gentoo, you can add the Bitcoin overlay and use your package manager:
-
-	layman -a bitcoin && emerge bitcoind
-	emerge -av1 --noreplace boost glib openssl sys-libs/db:4.8
-
-Take the following steps to build (no UPnP support):
-
-	cd ${BITCOIN_DIR}/src
-	make -f makefile.unix USE_UPNP= USE_IPV6=1 BDB_INCLUDE_PATH='/usr/include/db4.8'
-	strip bitcoind
-
 
 Notes
 -----
@@ -144,6 +132,9 @@ exploit even if a vulnerability is found, you can take the following measures:
     To build with PIE, use:
 
     	make -f makefile.unix ... -e PIE=1
+    
+    Note: To build with PIE in Gentoo Linux enable the 'hardened' USE flag. see man portage for info.
+    	
 
     To test that you have built PIE executable, install scanelf, part of paxutils, and use:
 
