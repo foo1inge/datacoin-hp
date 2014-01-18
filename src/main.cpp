@@ -4684,11 +4684,11 @@ void static BitcoinMiner(CWallet *pwallet)
             else
             {
 #ifdef __GNUC__
-       #ifdef CONFIG_PPC32
+       #ifdef __ppc__
                 nPrimeCounter += nPrimesHit;
                 nTestCounter += nTests;
                 nChainCounter += nChainsHit;
-       #elif CONFIG_PPC64
+       #elif __ppc64__
                 nPrimeCounter += nPrimesHit;
                 nTestCounter += nTests;
                 nChainCounter += nChainsHit;
