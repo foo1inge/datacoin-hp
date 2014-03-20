@@ -1,3 +1,6 @@
+This is experimental fork of datacoin-hp.
+
+
 datacoin-hp
 ===========
 
