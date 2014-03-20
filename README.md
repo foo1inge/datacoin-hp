@@ -1,4 +1,4 @@
-This is experimental fork of datacoin-hp.
+This is experimental fork of datacoin-hp, changes from primecoin-0.1.2-hp12 are being merged.
 
 
 datacoin-hp
@@ -13,12 +13,10 @@ Primecoin High Performance Version
 This is the high performance version of Sunny King's Primecoin tree.
 
 Features:
- * Use GMP for bignum calculations in the mining threads
- * Replaced some bignum calculations with 64-bit arithmetic inside the sieve
- * Reduced the amount of memory allocations
- * L1 and L2 cache optimizations
- * Process only 10% of base primes when weaving the sieve
- * Configurable sieve size
+ * Extended sieve algorithm
+ * Cache-friendly segmented sieve
+ * Adjustable sieve parameters
+ * Mining threads use GMP for faster bignum arithmetic
 
 Donations are welcome if you want to support my work.
 
@@ -74,7 +72,7 @@ ppcoin/primecoin forum (http://ppcointalk.org).
 
 The patch will be accepted if there is broad consensus that it is a good thing.
 Developers should expect to rework and resubmit patches if the code doesn't
-match the project's coding conventions (see `doc/coding.txt`) or are
+match the project's coding conventions (see `doc/coding.md`) or are
 controversial.
 
 The `master` branch is regularly built and tested, but is not guaranteed to be

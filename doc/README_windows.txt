@@ -1,21 +1,53 @@
-Primecoin High Performance Version
-==================================
+Primecoin High Performance Version 12
+=====================================
 
 This is the high performance version of Sunny King's Primecoin tree.
 
 Features:
- * Use GMP for bignum calculations in the mining threads
- * Replaced some bignum calculations with 64-bit arithmetic inside the sieve
- * Reduced the amount of memory allocations
- * L1 and L2 cache optimizations
- * Process only 10% of base primes when weaving the sieve
- * Configurable sieve size
+ * Extended sieve algorithm
+ * Cache-friendly segmented sieve
+ * Adjustable sieve parameters
+ * Mining threads use GMP for faster bignum arithmetic
 
 Donations are welcome if you want to support my work.
 
 BTC: 1EaHwHBWeoJtSM2jEdx9Su1NcKvdXbsqxX
 LTC: LPD1zDChmqcqKGHFHuLX2JWMMEC5jD5J4j
 XPM: AJHjbkVzHhHugd5bpKDtddVDfhtEB8jQZ4
+
+Sieve parameters
+----------------
+
+ * -sievesize determines how many numbers go through the sieve in one go. The
+default value is 917504 (default value of -l1cachesize times 32). This value
+has very little impact on performance.
+
+ * -sievefilterprimes determines how many primes factors will be filtered out
+by the sieve. The default value is 7849. This value has a minor impact on
+performance.
+
+ * -sieveextensions determines the number of sieve "extensions". Each extension
+will effectively process an additional set of numbers through the sieve
+relatively cheaply. The default value is 9. This value has a minor impact on
+performance.
+
+ * -l1cachesize determines the sieve segment size (in bytes). This should be
+the size of the L1 or L2 cache (or some other number close to them). The
+default value is 28672. This value has a minor impact on mining performance.
+
+ * -primorial determines the primorial that is used as a multiplier in all
+candidate numbers. This should a small prime number such as 47 or 53. Use the
+parameters -debug -printprimorial to see which primorials are used by default.
+This value has a minor impact on mining performance.
+
+Some parameters can be changed on the fly using the following RPC commands:
+ * setsievefilterprimes
+ * setsievesize
+ * setsieveextensions
+
+Old and removed parameters:
+ * -sieveroundpercentage
+ * -sievepercentage
 
 Primecoin 0.1.2 BETA
 ====================
@@ -27,6 +59,12 @@ file COPYING.
 This product includes software developed by the OpenSSL Project for use in
 the OpenSSL Toolkit (http://www.openssl.org/).  This product includes
 cryptographic software written by Eric Young (eay@cryptsoft.com).
+This product includes the GNU MP Library.^M
+
+The GNU MP Library is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 3 of the License, or (at your
+option) any later version.
 
 Intro
 ---------------------
@@ -54,7 +92,7 @@ Sourceforge (release builds): https://sourceforge.net/projects/primecoin
 
 
 
-Bitcoin 0.8.3 BETA
+Bitcoin 0.8.6 BETA
 ==================
 
 Copyright (c) 2009-2013 Bitcoin Developers
