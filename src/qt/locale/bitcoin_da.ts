@@ -248,8 +248,8 @@ Produktet indeholder software som er udviklet af OpenSSL Project til brug i Open
     </message>
     <message>
         <location line="+1"/>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR DATACOINS&lt;/b&gt;!</source>
-        <translation>Advarsel: Hvis du krypterer din tegnebog og mister din adgangskode, vil du &lt;b&gt;MISTE ALLE DINE DATACOINS&lt;/b&gt;!</translation>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR PRIMECOINS&lt;/b&gt;!</source>
+        <translation>Advarsel: Hvis du krypterer din tegnebog og mister din adgangskode, vil du &lt;b&gt;MISTE ALLE DINE PRIMECOINS&lt;/b&gt;!</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -756,8 +756,8 @@ Adresse: %4
     <message>
         <location filename="../guiutil.cpp" line="+424"/>
         <location line="+12"/>
-        <source>Datacoin-Qt</source>
-        <translation>Datacoin-Qt</translation>
+        <source>Datacoin High Performance-Qt</source>
+        <translation>Datacoin High Performance-Qt</translation>
     </message>
     <message>
         <location line="-12"/>
@@ -2187,8 +2187,8 @@ Adresse: %4
     <name>datacoin-core</name>
     <message>
         <location filename="../bitcoinstrings.cpp" line="+94"/>
-        <source>Datacoin version</source>
-        <translation>Datacoin-version</translation>
+        <source>Datacoin High Performance version</source>
+        <translation>Datacoin High Performance version</translation>
     </message>
     <message>
         <location line="+102"/>

@@ -31,13 +31,16 @@ LIBS= \
  -l boost_program_options-mt \
  -l boost_thread_win32-mt \
  -l boost_chrono-mt \
+ -l boost_timer-mt \
  -l db_cxx \
  -l ssl \
  -l crypto \
  -l z \
- -l gmp
+ -Wl,-Bdynamic \
+ -l gmp \
+ -Wl,-Bstatic
 
-DEFS=-D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -DBOOST_USE_WINDOWS_H -DFD_SETSIZE=1024 -DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x501
+DEFS=-D_MT -DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -DBOOST_USE_WINDOWS_H -DFD_SETSIZE=1024 -DWIN32_LEAN_AND_MEAN -DWINVER=0x500
 DEBUGFLAGS=-g
 xCXXFLAGS=-O2 -w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS) $(CXXFLAGS)
 # enable: ASLR, DEP and large address aware

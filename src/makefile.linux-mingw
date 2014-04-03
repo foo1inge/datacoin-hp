@@ -31,6 +31,7 @@ LIBS= \
  -l boost_program_options-mt \
  -l boost_thread_win32-mt \
  -l boost_chrono-mt \
+ -l boost_timer-mt \
  -l db_cxx \
  -l ssl \
  -l crypto \

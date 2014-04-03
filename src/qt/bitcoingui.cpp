@@ -68,7 +68,7 @@ BitcoinGUI::BitcoinGUI(QWidget *parent) :
     prevBlocks(0)
 {
     restoreWindowGeometry();
-    setWindowTitle(tr("Datacoin") + " - " + tr("Wallet"));
+    setWindowTitle(tr("Datacoin High Performance") + " - " + tr("Wallet"));
 #ifndef Q_OS_MAC
     QApplication::setWindowIcon(QIcon(":icons/datacoin"));
     setWindowIcon(QIcon(":icons/datacoin"));
@@ -598,7 +598,7 @@ void BitcoinGUI::setNumBlocks(int count, int nTotalBlocks)
 
 void BitcoinGUI::message(const QString &title, const QString &message, unsigned int style, bool *ret)
 {
-    QString strTitle = tr("Datacoin"); // default title
+    QString strTitle = tr("Datacoin High Performance"); // default title
     // Default to information icon
     int nMBoxIcon = QMessageBox::Information;
     int nNotifyIcon = Notificator::Information;

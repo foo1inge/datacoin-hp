@@ -12,8 +12,9 @@
 // Prime Table
 std::vector<unsigned int> vPrimes;
 unsigned int nSieveSize = nDefaultSieveSize;
-unsigned int nSievePercentage = nDefaultSievePercentage;
+unsigned int nSieveFilterPrimes = nDefaultSieveFilterPrimes;
 unsigned int nSieveExtensions = nDefaultSieveExtensions;
+unsigned int nL1CacheSize = nDefaultL1CacheSize;
 
 static unsigned int int_invert(unsigned int a, unsigned int nPrime);
 
@@ -22,12 +23,16 @@ void GeneratePrimeTable()
     const unsigned int nDefaultSieveExt = (fTestNet) ? nDefaultSieveExtensionsTestnet : nDefaultSieveExtensions;
     nSieveExtensions = (unsigned int)GetArg("-sieveextensions", nDefaultSieveExt);
     nSieveExtensions = std::max(std::min(nSieveExtensions, nMaxSieveExtensions), nMinSieveExtensions);
-    nSievePercentage = (unsigned int)GetArg("-sievepercentage", nDefaultSievePercentage);
-    nSievePercentage = std::max(std::min(nSievePercentage, nMaxSievePercentage), nMinSievePercentage);
     nSieveSize = (unsigned int)GetArg("-sievesize", nDefaultSieveSize);
     nSieveSize = std::max(std::min(nSieveSize, nMaxSieveSize), nMinSieveSize);
-    printf("GeneratePrimeTable() : setting nSieveExtensions = %u, nSievePercentage = %u, nSieveSize = %u\n", nSieveExtensions, nSievePercentage, nSieveSize);
-    const unsigned nPrimeTableLimit = nSieveSize;
+    nSieveFilterPrimes = (unsigned int)GetArg("-sievefilterprimes", nDefaultSieveFilterPrimes);
+    nSieveFilterPrimes = std::max(std::min(nSieveFilterPrimes, nMaxSieveFilterPrimes), nMinSieveFilterPrimes);
+    nL1CacheSize = (unsigned int)GetArg("-l1cachesize", nDefaultL1CacheSize);
+    nL1CacheSize = std::max(std::min(nL1CacheSize, nMaxL1CacheSize), nMinL1CacheSize);
+    nL1CacheSize = nL1CacheSize / 8 * 8; // make it a multiple of 8
+    printf("GeneratePrimeTable() : setting nSieveExtensions = %u, nSieveSize = %u, nSieveFilterPrimes = %u, nL1CacheSize = %u\n", nSieveExtensions, nSieveSize, nSieveFilterPrimes, nL1CacheSize);
+
+    const unsigned nPrimeTableLimit = 1000000u;
     vPrimes.clear();
     // Generate prime table using sieve of Eratosthenes
     std::vector<bool> vfComposite (nPrimeTableLimit, false);
@@ -42,6 +47,109 @@ void GeneratePrimeTable()
         if (!vfComposite[n])
             vPrimes.push_back(n);
     printf("GeneratePrimeTable() : prime table [1, %u] generated with %u primes\n", nPrimeTableLimit, (unsigned int) vPrimes.size());
+}
+
+// Mining statistics
+uint64 nTotalTests;
+unsigned int nTotalBlocksFound;
+std::vector<uint64> vTotalChainsFound;
+boost::timer::cpu_timer minerTimer;
+int nSieveTargetLength = -1;
+
+// Primecoin HP: Optional automatic donations with every block found
+CBitcoinAddress donationAddress;
+double dDonationPercentage;
+
+void ResetMinerStatistics()
+{
+    nTotalTests = 0;
+    nTotalBlocksFound = 0;
+    vTotalChainsFound = std::vector<uint64> (nMaxChainLength, 0);
+}
+
+void InitPrimeMiner()
+{
+    ResetMinerStatistics();
+    nSieveTargetLength = std::min((int)GetArg("-sievetargetlength", nDefaultSieveTargetLength), (int)nMaxChainLength);
+    if (nSieveTargetLength > 0)
+        printf("InitPrimeMiner() : Setting sieve target length to %d\n", nSieveTargetLength);
+
+    // Primecoin HP: Optional automatic donations with every block found
+    std::string strDonationPercentage = GetArg("-donationpercentage", "0.0");
+    std::string strDonationAddress = GetArg("-donationaddress", !fTestNet ? strDefaultDonationAddress : strDefaultDonationAddressTestnet);
+    dDonationPercentage = atof(strDonationPercentage.c_str());
+    if (dDonationPercentage < dMinDonationPercentage)
+        dDonationPercentage = 0.0;
+    dDonationPercentage = std::min(dDonationPercentage, dMaxDonationPercentage);
+    donationAddress = CBitcoinAddress(strDonationAddress);
+    if (!donationAddress.IsValid())
+    {
+        dDonationPercentage = 0.0;
+        printf("InitPrimeMiner(): Donation address is invalid, disabling donations\n");
+    }
+    if (dDonationPercentage > 0.001)
+        printf("InitPrimeMiner(): Donating %2.2f%% of every block found to %s (thank you!)\n", dDonationPercentage, strDonationAddress.c_str());
+    else
+        printf("InitPrimeMiner(): Donations disabled\n");
+}
+
+void PrintMinerStatistics()
+{
+    printf("========================================================================\n");
+    printf("Miner statistics\n");
+    printf("========================================================================\n");
+
+    boost::timer::cpu_times const elapsed_times(minerTimer.elapsed());
+    int64 nRunningTime = elapsed_times.wall;
+    double dRunningHours = (double)nRunningTime / 3600000000000.0;
+    int64 nCPUTime = elapsed_times.system + elapsed_times.user;
+    double dCPUHours = (double)nCPUTime / 3600000000000.0;
+    printf("Running time: %.4f hours\n", dRunningHours);
+    printf("CPU time: %.4f hours\n", dCPUHours);
+
+    printf("Tests: %"PRI64u"\n", nTotalTests);
+    printf("Blocks found: %u\n", nTotalBlocksFound);
+
+    // Find the last non-zero chain count
+    unsigned int nMaxPrintLength = nMaxChainLength;
+    for (int i = nMaxChainLength - 1; i >= 0; i--)
+    {
+        if (vTotalChainsFound[i] > 0)
+        {
+            nMaxPrintLength = i + 1;
+            break;
+        }
+    }
+
+    printf("\n");
+    printf("Chain statistics\n");
+    for (unsigned int i = 0; i < nMaxPrintLength; i++)
+        printf("%u-chains: %"PRI64u"\n", i + 1, vTotalChainsFound[i]);
+
+    printf("========================================================================\n");
+
+    // Reset statistics
+    nHPSTimerStart = 0;
+    ResetMinerStatistics();
+}
+
+void PrintCompactStatistics(volatile unsigned int vFoundChainCounter[nMaxChainLength])
+{
+    std::string strOutput;
+    if (fLogTimestamps)
+        strOutput = "chainstats ";
+    else
+        strOutput = strprintf("%s chainstats ", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()).c_str());
+    for (unsigned int i = 0; i < nMaxChainLength; i++)
+    {
+        if (vFoundChainCounter[i])
+            strOutput += strprintf(" %uch: %u", i + 1, vFoundChainCounter[i]);
+    }
+    printf("%s\n", strOutput.c_str());
+
+    // Reset the statistics
+    for (unsigned int i = 0; i < nMaxChainLength; i++)
+        vFoundChainCounter[i] = 0;
 }
 
 // Get next prime number of p
@@ -510,45 +618,6 @@ unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned i
 /* PRIMECOIN MINING */
 /********************/
 
-class CPrimalityTestParams
-{
-public:
-    // GMP variables
-    mpz_t mpzE;
-    mpz_t mpzR;
-    mpz_t mpzRplusOne;
-    
-    // GMP C++ variables
-    mpz_class mpzOriginMinusOne;
-    mpz_class mpzOriginPlusOne;
-    mpz_class N;
-
-    // Values specific to a round
-    unsigned int nBits;
-    unsigned int nPrimorialSeq;
-    unsigned int nCandidateType;
-
-    // Results
-    unsigned int nChainLength;
-
-    CPrimalityTestParams(unsigned int nBits, unsigned int nPrimorialSeq)
-    {
-        this->nBits = nBits;
-        this->nPrimorialSeq = nPrimorialSeq;
-        nChainLength = 0;
-        mpz_init(mpzE);
-        mpz_init(mpzR);
-        mpz_init(mpzRplusOne);
-    }
-
-    ~CPrimalityTestParams()
-    {
-        mpz_clear(mpzE);
-        mpz_clear(mpzR);
-        mpz_clear(mpzRplusOne);
-    }
-};
-
 // Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
 // true: n is probable prime
 // false: n is composite; set fractional length in the nLength output
@@ -582,7 +651,7 @@ static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nL
 // Return values
 //   true: n is probable prime
 //   false: n is composite; set fractional length in the nLength output
-static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSophieGermain, unsigned int& nLength, CPrimalityTestParams& testParams)
+static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSophieGermain, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastFail = false)
 {
     // Faster GMP version
     mpz_t& mpzE = testParams.mpzE;
@@ -610,12 +679,12 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
         fPassedTest = !mpz_cmp_ui(mpzR, 1);
     else
         return error("EulerLagrangeLifchitzPrimalityTest() : invalid n %% 8 = %d, %s", nMod8, (fSophieGermain? "first kind" : "second kind"));
-    
+
     if (fPassedTest)
-    {
         return true;
-    }
-    
+    if (fFastFail)
+        return false;
+
     // Failed test, calculate fractional length
     mpz_mul(mpzE, mpzR, mpzR);
     mpz_tdiv_r(mpzR, mpzE, n.get_mpz_t()); // derive Fermat test remainder
@@ -635,38 +704,65 @@ static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSop
 // fSophieGermain:
 //   true - Test for Cunningham Chain of first kind (n, 2n+1, 4n+3, ...)
 //   false - Test for Cunningham Chain of second kind (n, 2n-1, 4n-3, ...)
-// Return value:
-//   true - Probable Cunningham Chain found (length at least 2)
-//   false - Not Cunningham Chain
-static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams)
+static void ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams)
 {
     nProbableChainLength = 0;
 
     // Fermat test for n first
     if (!FermatProbablePrimalityTestFast(n, nProbableChainLength, testParams, true))
-        return false;
+        return;
 
     // Euler-Lagrange-Lifchitz test for the following numbers in chain
-    mpz_class &N = testParams.N;
+    mpz_class &N = testParams.mpzN;
     N = n;
-    while (true)
+    for (unsigned int nChainSeq = 1; true; nChainSeq++)
     {
         TargetIncrementLength(nProbableChainLength);
         N <<= 1;
         N += (fSophieGermain? 1 : (-1));
-        if (fFermatTest)
-        {
-            if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams))
-                break;
-        }
-        else
-        {
-            if (!EulerLagrangeLifchitzPrimalityTestFast(N, fSophieGermain, nProbableChainLength, testParams))
-                break;
-        }
+        bool fFastFail = nChainSeq < 4;
+        if (!EulerLagrangeLifchitzPrimalityTestFast(N, fSophieGermain, nProbableChainLength, testParams, fFastFail))
+            break;
     }
+}
 
-    return (TargetGetLength(nProbableChainLength) >= 2);
+// Test Probable BiTwin Chain for: mpzOrigin
+// Test the numbers in the optimal order for any given chain length
+// Gives the correct length of a BiTwin chain even for short chains
+static void ProbableBiTwinChainTestFast(const mpz_class& mpzOrigin, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams)
+{
+    mpz_class& mpzOriginMinusOne = testParams.mpzOriginMinusOne;
+    mpz_class& mpzOriginPlusOne = testParams.mpzOriginPlusOne;
+    nProbableChainLength = 0;
+
+    // Fermat test for origin-1 first
+    mpzOriginMinusOne = mpzOrigin - 1;
+    if (!FermatProbablePrimalityTestFast(mpzOriginMinusOne, nProbableChainLength, testParams, true))
+        return;
+    TargetIncrementLength(nProbableChainLength);
+
+    // Fermat test for origin+1
+    mpzOriginPlusOne = mpzOrigin + 1;
+    if (!FermatProbablePrimalityTestFast(mpzOriginPlusOne, nProbableChainLength, testParams, true))
+        return;
+    TargetIncrementLength(nProbableChainLength);
+
+    // Euler-Lagrange-Lifchitz test for the following numbers in chain
+    for (unsigned int nChainSeq = 2; true; nChainSeq += 2)
+    {
+        mpzOriginMinusOne <<= 1;
+        mpzOriginMinusOne++;
+        bool fFastFail = nChainSeq < 4;
+        if (!EulerLagrangeLifchitzPrimalityTestFast(mpzOriginMinusOne, true, nProbableChainLength, testParams, fFastFail))
+            break;
+        TargetIncrementLength(nProbableChainLength);
+
+        mpzOriginPlusOne <<= 1;
+        mpzOriginPlusOne--;
+        if (!EulerLagrangeLifchitzPrimalityTestFast(mpzOriginPlusOne, false, nProbableChainLength, testParams, fFastFail))
+            break;
+        TargetIncrementLength(nProbableChainLength);
+    }
 }
 
 // Test probable prime chain for: nOrigin
@@ -677,114 +773,182 @@ static bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPr
 {
     const unsigned int nBits = testParams.nBits;
     const unsigned int nCandidateType = testParams.nCandidateType;
-    unsigned int& nChainLength = testParams.nChainLength;
     mpz_class& mpzOriginMinusOne = testParams.mpzOriginMinusOne;
     mpz_class& mpzOriginPlusOne = testParams.mpzOriginPlusOne;
+    unsigned int& nChainLength = testParams.nChainLength;
     nChainLength = 0;
 
     // Test for Cunningham Chain of first kind
     if (nCandidateType == PRIME_CHAIN_CUNNINGHAM1)
     {
         mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
-        ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, false, nChainLength, testParams);
+        ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, nChainLength, testParams);
     }
     else if (nCandidateType == PRIME_CHAIN_CUNNINGHAM2)
     {
         // Test for Cunningham Chain of second kind
         mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
-        ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, false, nChainLength, testParams);
+        ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, nChainLength, testParams);
     }
-    else
+    else if (nCandidateType == PRIME_CHAIN_BI_TWIN)
     {
-        unsigned int nChainLengthCunningham1 = 0;
-        unsigned int nChainLengthCunningham2 = 0;
-        mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
-        if (ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, false, nChainLengthCunningham1, testParams))
-        {
-            mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
-            ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, false, nChainLengthCunningham2, testParams);
-            // Figure out BiTwin Chain length
-            // BiTwin Chain allows a single prime at the end for odd length chain
-            nChainLength =
-                (TargetGetLength(nChainLengthCunningham1) > TargetGetLength(nChainLengthCunningham2))?
-                    (nChainLengthCunningham2 + TargetFromInt(TargetGetLength(nChainLengthCunningham2)+1)) :
-                    (nChainLengthCunningham1 + TargetFromInt(TargetGetLength(nChainLengthCunningham1)));
-        }
+        ProbableBiTwinChainTestFast(mpzPrimeChainOrigin, nChainLength, testParams);
     }
 
     return (nChainLength >= nBits);
 }
 
-// Sieve for mining
-boost::thread_specific_ptr<CSieveOfEratosthenes> psieve;
+// Perform Fermat test with trial division
+// Return values:
+//   true  - passes trial division test and Fermat test; probable prime
+//   false - failed either trial division or Fermat test; composite
+bool ProbablePrimalityTestWithTrialDivision(const mpz_class& mpzCandidate, unsigned int nTrialDivisionLimit, CPrimalityTestParams& testParams)
+{
+    unsigned int nDivisor = 2 * 3 * 5 * 7 * 11 * 13 * 17 * 19 * 23;
+    unsigned int nDivisorPrimes = 9;
+
+    // Fast trial division for the first few primes
+    unsigned long nModulo = mpz_tdiv_ui(mpzCandidate.get_mpz_t(), nDivisor);
+    for (unsigned int i = 0; i < nDivisorPrimes; i++)
+    {
+        if (nModulo % vPrimes[i] == 0)
+            return false;
+    }
+
+    // Trial division
+    for (unsigned int i = nDivisorPrimes; i < nTrialDivisionLimit; i++)
+    {
+        if (mpz_divisible_ui_p(mpzCandidate.get_mpz_t(), vPrimes[i]))
+            return false;
+    }
+    unsigned int nLength = 0;
+    return (FermatProbablePrimalityTestFast(mpzCandidate, nLength, testParams, true));
+}
+
+static void SieveDebugChecks(unsigned int nBits, unsigned int nTriedMultiplier, unsigned int nCandidateType, mpz_class& mpzHash, mpz_class& mpzFixedMultiplier, mpz_class& mpzChainOrigin)
+{
+    // Debugging code to verify the sieve output
+    const unsigned int nTargetLength = TargetGetLength(nBits);
+    mpz_class mpzChainN;
+    mpz_class mpzChainNMod;
+    if (nCandidateType == PRIME_CHAIN_CUNNINGHAM1 || nCandidateType == PRIME_CHAIN_BI_TWIN)
+    {
+        unsigned int nCC1Length = nTargetLength;
+        if (nCandidateType == PRIME_CHAIN_BI_TWIN)
+            nCC1Length = (nTargetLength + 1) / 2;
+        for (unsigned int nChainPosition = 0; nChainPosition < nCC1Length; nChainPosition++)
+        {
+            mpzChainN = mpzChainOrigin << nChainPosition;
+            mpzChainN--;
+            for (unsigned int nPrimeSeq = 0; nPrimeSeq < nSieveFilterPrimes; nPrimeSeq++)
+            {
+                if (mpz_divisible_ui_p(mpzChainN.get_mpz_t(), vPrimes[nPrimeSeq]) > 0)
+                {
+                    std::string strHash = mpzHash.get_str();
+                    std::string strFixedMultiplier = mpzFixedMultiplier.get_str();
+                    printf("SIEVE BUG: %s * %s * %u * 2^%u - 1 is divisible by %u!\n", strHash.c_str(), strFixedMultiplier.c_str(), nTriedMultiplier, nChainPosition, vPrimes[nPrimeSeq]);
+                }
+            }
+        }
+    }
+    if (nCandidateType == PRIME_CHAIN_CUNNINGHAM2 || nCandidateType == PRIME_CHAIN_BI_TWIN)
+    {
+        unsigned int nCC2Length = nTargetLength;
+        if (nCandidateType == PRIME_CHAIN_BI_TWIN)
+            nCC2Length = nTargetLength / 2;
+        for (unsigned int nChainPosition = 0; nChainPosition < nCC2Length; nChainPosition++)
+        {
+            mpzChainN = mpzChainOrigin << nChainPosition;
+            mpzChainN++;
+            for (unsigned int nPrimeSeq = 0; nPrimeSeq < nSieveFilterPrimes; nPrimeSeq++)
+            {
+                if (mpz_divisible_ui_p(mpzChainN.get_mpz_t(), vPrimes[nPrimeSeq]) > 0)
+                {
+                    std::string strHash = mpzHash.get_str();
+                    std::string strFixedMultiplier = mpzFixedMultiplier.get_str();
+                    printf("SIEVE BUG: %s * %s * %u * 2^%u + 1 is divisible by %u!\n", strHash.c_str(), strFixedMultiplier.c_str(), nTriedMultiplier, nChainPosition, vPrimes[nPrimeSeq]);
+                }
+            }
+        }
+    }
+    if (nCandidateType == 0)
+    {
+        std::string strHash = mpzHash.get_str();
+        std::string strFixedMultiplier = mpzFixedMultiplier.get_str();
+        printf("SIEVE BUG: %s * %s * %u has unknown type!\n", strHash.c_str(), strFixedMultiplier.c_str(), nTriedMultiplier);
+    }
+}
 
 // Mine probable prime chain of form: n = h * p# +/- 1
-bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit, unsigned int& nChainsHit, mpz_class& mpzHash, unsigned int nPrimorialMultiplier, int64& nSieveGenTime, CBlockIndex* pindexPrev)
+bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTests, unsigned int& nPrimesHit, mpz_class& mpzHash, CBlockIndex* pindexPrev, unsigned int vChainsFound[nMaxChainLength], CSieveOfEratosthenes& sieve, CPrimalityTestParams& testParams)
 {
-    CSieveOfEratosthenes *lpsieve;
-    nProbableChainLength = 0;
     nTests = 0;
     nPrimesHit = 0;
-    nChainsHit = 0;
-    const unsigned int nBits = block.nBits;
 
-    if (fNewBlock && psieve.get() != NULL)
+    // References to test parameters
+    unsigned int& nBits = testParams.nBits;
+    unsigned int& nChainLength = testParams.nChainLength;
+    unsigned int& nCandidateType = testParams.nCandidateType;
+    mpz_class& mpzHashFixedMult = testParams.mpzHashFixedMult;
+    mpz_class& mpzChainOrigin = testParams.mpzChainOrigin;
+    nBits = block.nBits;
+
+    if (fNewBlock)
     {
         // Must rebuild the sieve
-        psieve.reset();
+        sieve.Deplete();
     }
     fNewBlock = false;
 
-    int64 nStart; // microsecond timer
-    if ((lpsieve = psieve.get()) == NULL)
+    int64 nStart = 0; // microsecond timer
+    if (!sieve.IsReady() || sieve.IsDepleted())
     {
         // Build sieve
-        nStart = GetTimeMicros();
-        lpsieve = new CSieveOfEratosthenes(nSieveSize, nSievePercentage, nSieveExtensions, nBits, mpzHash, mpzFixedMultiplier, pindexPrev);
-        while (lpsieve->Weave() && pindexPrev == pindexBest);
-        nSieveGenTime = GetTimeMicros() - nStart;
         if (fDebug && GetBoolArg("-printmining"))
-            printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", lpsieve->GetCandidateCount(), nSieveSize, lpsieve->GetProgressPercentage(), (unsigned int) nSieveGenTime);
-        psieve.reset(lpsieve);
+            nStart = GetTimeMicros();
+        sieve.Reset(nSieveSize, nSieveFilterPrimes, nSieveExtensions, nL1CacheSize, nBits, mpzHash, mpzFixedMultiplier, pindexPrev);
+        sieve.Weave();
+        if (fDebug && GetBoolArg("-printmining"))
+            printf("MineProbablePrimeChain() : new sieve (%u/%u@%u%%) ready in %uus\n", sieve.GetCandidateCount(), nSieveSize, sieve.GetProgressPercentage(), (unsigned int) (GetTimeMicros() - nStart));
         return false; // sieve generation takes time so return now
     }
 
-    mpz_class mpzHashMultiplier = mpzHash * mpzFixedMultiplier;
-    mpz_class mpzChainOrigin;
-    
-    // Determine the sequence number of the round primorial
-    unsigned int nPrimorialSeq = 0;
-    while (vPrimes[nPrimorialSeq + 1] <= nPrimorialMultiplier)
-        nPrimorialSeq++;
+    if (fDebug && GetBoolArg("-printmining2"))
+        nStart = GetTimeMicros();
 
-    // Allocate GMP variables for primality tests
-    CPrimalityTestParams testParams(nBits, nPrimorialSeq);
-
-    nStart = GetTimeMicros();
-    
-    // References to test parameters
-    unsigned int& nChainLength = testParams.nChainLength;
-    unsigned int& nCandidateType = testParams.nCandidateType;
-    
     // Number of candidates to be tested during a single call to this function
     const unsigned int nTestsAtOnce = 500;
+    mpzHashFixedMult = mpzHash * mpzFixedMultiplier;
 
     // Process a part of the candidates
     while (nTests < nTestsAtOnce && pindexPrev == pindexBest)
     {
-        if (!lpsieve->GetNextCandidateMultiplier(nTriedMultiplier, nCandidateType))
+        unsigned int nTriedMultiplier = 0;
+        if (!sieve.GetNextCandidateMultiplier(nTriedMultiplier, nCandidateType))
         {
             // power tests completed for the sieve
-            //if (fDebug && GetBoolArg("-printmining"))
-                //printf("MineProbablePrimeChain() : %u tests (%u primes and %u %d-chains) in %uus\n", nTests, nPrimesHit, nChainsHit, nStatsChainLength, (unsigned int) (GetTimeMicros() - nStart));
-            psieve.reset();
+            if (fDebug && GetBoolArg("-printmining2"))
+                printf("MineProbablePrimeChain() : %u tests (%u primes) in %uus\n", nTests, nPrimesHit, (unsigned int) (GetTimeMicros() - nStart));
             fNewBlock = true; // notify caller to change nonce
             return false;
         }
         nTests++;
-        mpzChainOrigin = mpzHashMultiplier * nTriedMultiplier;
-        nChainLength = 0;
-        if (ProbablePrimeChainTestFast(mpzChainOrigin, testParams))
+        mpzChainOrigin = mpzHashFixedMult * nTriedMultiplier;
+        bool fChainFound = ProbablePrimeChainTestFast(mpzChainOrigin, testParams);
+        unsigned int nChainPrimeLength = TargetGetLength(nChainLength);
+
+        if (fDebug && GetBoolArg("-debugsieve"))
+            SieveDebugChecks(nBits, nTriedMultiplier, nCandidateType, mpzHash, mpzFixedMultiplier, mpzChainOrigin);
+
+        // Collect mining statistics
+        if(nChainPrimeLength >= 1)
+        {
+            nPrimesHit++;
+            vChainsFound[nChainPrimeLength - 1]++;
+        }
+
+        // Check if a chain was found
+        if (fChainFound)
         {
             mpz_class mpzPrimeChainMultiplier = mpzFixedMultiplier * nTriedMultiplier;
             CBigNum bnPrimeChainMultiplier;
@@ -793,25 +957,12 @@ bool MineProbablePrimeChain(CBlock& block, mpz_class& mpzFixedMultiplier, bool& 
             printf("nTriedMultiplier = %u\n", nTriedMultiplier); // Debugging
             printf("Probable prime chain found for block=%s!!\n  Target: %s\n  Chain: %s\n", block.GetHash().GetHex().c_str(),
                 TargetToString(block.nBits).c_str(), GetPrimeChainName(nCandidateType, nChainLength).c_str());
-            nProbableChainLength = nChainLength;
             return true;
         }
-        nProbableChainLength = nChainLength;
-        if(TargetGetLength(nProbableChainLength) >= 1)
-            nPrimesHit++;
-        if(TargetGetLength(nProbableChainLength) >= nStatsChainLength)
-            nChainsHit++;
-        // Debugging
-#if 0
-        if(TargetGetLength(nProbableChainLength) >= 1)
-            printf("Multiplier %u gave a prime\n", nTriedMultiplier);
-        else
-            printf("Multiplier %u gave nothing\n", nTriedMultiplier);
-#endif
     }
     
-    //if (fDebug && GetBoolArg("-printmining"))
-        //printf("MineProbablePrimeChain() : %u tests (%u primes and %u %d-chains) in %uus\n", nTests, nPrimesHit, nChainsHit, nStatsChainLength, (unsigned int) (GetTimeMicros() - nStart));
+    if (fDebug && GetBoolArg("-printmining2"))
+        printf("MineProbablePrimeChain() : %u tests (%u primes) in %uus\n", nTests, nPrimesHit, (unsigned int) (GetTimeMicros() - nStart));
     
     return false; // stop as new block arrived
 }
@@ -869,30 +1020,32 @@ void CSieveOfEratosthenes::ProcessMultiplier(sieve_word_t *vfComposites, const u
 {
     // Wipe the part of the array first
     if (nMinMultiplier < nMaxMultiplier)
+    {
         memset(vfComposites + GetWordNum(nMinMultiplier), 0, (nMaxMultiplier - nMinMultiplier + nWordBits - 1) / nWordBits * sizeof(sieve_word_t));
 
-    for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
-    {
-        const unsigned int nPrime = vPrimes[nPrimeSeq];
-        unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq];
-        if (nVariableMultiplier < nMinMultiplier)
-            nVariableMultiplier += (nMinMultiplier - nVariableMultiplier + nPrime - 1) / nPrime * nPrime;
+        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+        {
+            const unsigned int nPrime = vPrimes[nPrimeSeq];
+            unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq];
+            if (nVariableMultiplier < nMinMultiplier)
+                nVariableMultiplier += (nMinMultiplier - nVariableMultiplier + nPrime - 1) / nPrime * nPrime;
 #ifdef USE_ROTATE
-        const unsigned int nRotateBits = nPrime % nWordBits;
-        sieve_word_t lBitMask = GetBitMask(nVariableMultiplier);
-        for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
-        {
-            vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
-            lBitMask = (lBitMask << nRotateBits) | (lBitMask >> (nWordBits - nRotateBits));
-        }
-        vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq] = nVariableMultiplier;
+            const unsigned int nRotateBits = nPrime % nWordBits;
+            sieve_word_t lBitMask = GetBitMask(nVariableMultiplier);
+            for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+            {
+                vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
+                lBitMask = rotate_left(lBitMask, nRotateBits);
+            }
+            vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq] = nVariableMultiplier;
 #else
-        for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
-        {
-            vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
-        }
-        vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq] = nVariableMultiplier;
+            for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+            {
+                vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
+            }
+            vMultipliers[nPrimeSeq * nSieveLayers + nLayerSeq] = nVariableMultiplier;
 #endif
+        }
     }
 }
 
@@ -902,25 +1055,9 @@ void CSieveOfEratosthenes::ProcessMultiplier(sieve_word_t *vfComposites, const u
 //   False - sieve already completed
 bool CSieveOfEratosthenes::Weave()
 {
-    const unsigned int nMultiplierBytes = nPrimes * nSieveLayers * sizeof(unsigned int);
-    unsigned int *vCunningham1Multipliers = (unsigned int *)malloc(nMultiplierBytes);
-    unsigned int *vCunningham2Multipliers = (unsigned int *)malloc(nMultiplierBytes);
-
-    memset(vCunningham1Multipliers, 0xFF, nMultiplierBytes);
-    memset(vCunningham2Multipliers, 0xFF, nMultiplierBytes);
-
-    // bitsets that can be combined to obtain the final bitset of candidates
-    sieve_word_t *vfCompositeLayerCC1 = (sieve_word_t *)malloc(nCandidatesBytes);
-    sieve_word_t *vfCompositeLayerCC2 = (sieve_word_t *)malloc(nCandidatesBytes);
-
     // Check whether fixed multiplier fits in an unsigned long
     bool fUseLongForFixedMultiplier = mpzFixedMultiplier < ULONG_MAX;
-    unsigned long nFixedMultiplier;
-    mpz_class mpzFixedFactor;
-    if (fUseLongForFixedMultiplier)
-        nFixedMultiplier = mpzFixedMultiplier.get_ui();
-    else
-        mpzFixedFactor = mpzHash * mpzFixedMultiplier;
+    unsigned long nFixedMultiplier = mpzFixedMultiplier.get_ui();
 
     unsigned int nCombinedEndSeq = 1;
     unsigned int nFixedFactorCombinedMod = 0;
@@ -946,7 +1083,7 @@ bool CSieveOfEratosthenes::Weave()
                 nFixedFactorCombinedMod = (uint64)nFixedFactorCombinedMod * (nFixedMultiplier % nPrimeCombined) % nPrimeCombined;
             }
             else
-                nFixedFactorCombinedMod = mpz_tdiv_ui(mpzFixedFactor.get_mpz_t(), nPrimeCombined);
+                nFixedFactorCombinedMod = mpz_tdiv_ui(mpzHashFixedMult.get_mpz_t(), nPrimeCombined);
         }
 
         unsigned int nFixedFactorMod = nFixedFactorCombinedMod % nPrime;
@@ -992,9 +1129,7 @@ bool CSieveOfEratosthenes::Weave()
         }
     }
 
-    // Number of elements that are likely to fit in L1 cache
-    // NOTE: This needs to be a multiple of nWordBits
-    const unsigned int nL1CacheElements = 224000;
+    // Process the array in chunks that fit the L1 cache
     const unsigned int nArrayRounds = (nSieveSize + nL1CacheElements - 1) / nL1CacheElements;
 
     // Calculate the number of CC1 and CC2 layers needed for BiTwin candidates
@@ -1121,12 +1256,6 @@ bool CSieveOfEratosthenes::Weave()
     // The sieve has been partially weaved
     this->nPrimeSeq = nPrimes - 1;
 
-    free(vfCompositeLayerCC1);
-    free(vfCompositeLayerCC2);
-
-    free(vCunningham1Multipliers);
-    free(vCunningham2Multipliers);
-
     return false;
 }
 
@@ -1134,7 +1263,7 @@ static const double dLogTwo = log(2.0);
 static const double dLogOneAndHalf = log(1.5);
 
 // Estimate the probability of primality for a number in a candidate chain
-double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier, unsigned int nChainPrimeNum)
+double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier, unsigned int nChainPrimeNum, unsigned int nMiningProtocol)
 {
     // h * q# / r# * s is prime with probability 1/log(h * q# / r# * s),
     //   (prime number theorem)
@@ -1151,13 +1280,16 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier, unsi
     // statistically independent after running the sieve, which might not be
     // true, but nontheless it's a reasonable model of the chances of finding
     // prime chains.
-    const unsigned int nSieveWeaveOptimalPrime = vPrimes[(unsigned int) ((uint64) nSievePercentage * vPrimes.size() / 100) - 1];
+    const unsigned int nSieveWeaveOptimalPrime = vPrimes[nSieveFilterPrimes - 1];
     const unsigned int nAverageCandidateMultiplier = nSieveSize / 2;
     double dFixedMultiplier = 1.0;
     for (unsigned int i = 0; vPrimes[i] <= nPrimorialMultiplier; i++)
         dFixedMultiplier *= vPrimes[i];
-    for (unsigned int i = 0; vPrimes[i] <= nPrimorialHashFactor; i++)
-        dFixedMultiplier /= vPrimes[i];
+    if (nMiningProtocol < 2)
+    {
+        for (unsigned int i = 0; vPrimes[i] <= nPrimorialHashFactor; i++)
+            dFixedMultiplier /= vPrimes[i];
+    }
 
     double dExtendedSieveWeightedSum = 0.5 * nSieveSize;
     double dExtendedSieveCandidates = nSieveSize;
@@ -1169,4 +1301,34 @@ double EstimateCandidatePrimeProbability(unsigned int nPrimorialMultiplier, unsi
     const double dExtendedSieveAverageMultiplier = dExtendedSieveWeightedSum / dExtendedSieveCandidates;
 
     return (1.781072 * log((double)std::max(1u, nSieveWeaveOptimalPrime)) / (255.0 * dLogTwo + dLogOneAndHalf + log(dFixedMultiplier) + log(nAverageCandidateMultiplier) + dLogTwo * nChainPrimeNum + log(dExtendedSieveAverageMultiplier)));
+}
+
+// Esimate the prime probablity of numbers that haven't been sieved
+double EstimateNormalPrimeProbability(unsigned int nPrimorialMultiplier, unsigned int nChainPrimeNum, unsigned int nMiningProtocol)
+{
+    const unsigned int nAverageCandidateMultiplier = nSieveSize / 2;
+    double dFixedMultiplier = 1.0;
+    for (unsigned int i = 0; vPrimes[i] <= nPrimorialMultiplier; i++)
+        dFixedMultiplier *= vPrimes[i];
+    if (nMiningProtocol < 2)
+    {
+        for (unsigned int i = 0; vPrimes[i] <= nPrimorialHashFactor; i++)
+            dFixedMultiplier /= vPrimes[i];
+    }
+
+    double dExtendedSieveWeightedSum = 0.5 * nSieveSize;
+    double dExtendedSieveCandidates = nSieveSize;
+    for (unsigned int i = 0; i < nSieveExtensions; i++)
+    {
+        dExtendedSieveWeightedSum += 0.75 * (nSieveSize * (2 << i));
+        dExtendedSieveCandidates += nSieveSize / 2;
+    }
+    const double dExtendedSieveAverageMultiplier = dExtendedSieveWeightedSum / dExtendedSieveCandidates;
+
+    // The primorial is implicitly filtering out the first few prime factors
+    double dPrimorialBoost = 1.0;
+    for (unsigned int i = 0; vPrimes[i] <= nPrimorialMultiplier; i++)
+        dPrimorialBoost *= (double)vPrimes[i] / (vPrimes[i] - 1);
+
+    return (dPrimorialBoost / (255.0 * dLogTwo + dLogOneAndHalf + log(dFixedMultiplier) + log(nAverageCandidateMultiplier) + dLogTwo * nChainPrimeNum + log(dExtendedSieveAverageMultiplier)));
 }

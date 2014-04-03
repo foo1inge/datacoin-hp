@@ -759,7 +759,7 @@ Address: %4
     <message>
         <location filename="../guiutil.cpp" line="+424"/>
         <location line="+12"/>
-        <source>Datacoin-Qt</source>
+        <source>Datacoin High Performance-Qt</source>
         <translation>bitcoin-qt</translation>
     </message>
     <message>
