@@ -20,15 +20,15 @@
 extern std::vector<unsigned int> vPrimes;
 static const unsigned int nMaxSieveExtensions = 20;
 static const unsigned int nMinSieveExtensions = 0;
-static const unsigned int nDefaultSieveExtensions = 9;
+static const unsigned int nDefaultSieveExtensions = 10;
 static const unsigned int nDefaultSieveExtensionsTestnet = 4;
 extern unsigned int nSieveExtensions;
 static const unsigned int nMaxSieveFilterPrimes = 78498u; // size of prime table
-static const unsigned int nDefaultSieveFilterPrimes = 7849u;
+static const unsigned int nDefaultSieveFilterPrimes = 14000u;
 static const unsigned int nMinSieveFilterPrimes = 1000u;
 extern unsigned int nSieveFilterPrimes;
 static const unsigned int nMaxSieveSize = 10000000u;
-static const unsigned int nDefaultSieveSize = 917504u;
+static const unsigned int nDefaultSieveSize = 1376256u;
 static const unsigned int nMinSieveSize = 100000u;
 extern unsigned int nSieveSize;
 static const unsigned int nMaxL1CacheSize = 128000u;
@@ -57,10 +57,10 @@ static const unsigned int nDefaultSieveTargetLength = -1;
 extern int nSieveTargetLength;
 
 // Primecoin HP: Optional automatic donations with every block found
-static const std::string strDefaultDonationPercentage = "0.0";
+static const std::string strDefaultDonationPercentage = "1.0";
 static const double dMinDonationPercentage = 0.1;
 static const double dMaxDonationPercentage = 99.9;
-static const std::string strDefaultDonationAddress = "APRimehpExTQJ5fssWa5r84nYEnwGYffXK";
+static const std::string strDefaultDonationAddress = "DSSHsB1R8mrZd1ujhxcPqQaqAu2cNZsCNn";
 static const std::string strDefaultDonationAddressTestnet = "mpriMeHPGWdXYZNtM3ib4WqaViKnrZafkY";
 extern CBitcoinAddress donationAddress;
 extern double dDonationPercentage;
@@ -169,18 +169,56 @@ double EstimateNormalPrimeProbability(unsigned int nPrimorialMultiplier, unsigne
 #    define USE_GCC_BUILTINS
 #endif
 
+#ifdef USE_GCC_BUILTINS
+#    define likely(x)       __builtin_expect(!!(x),1)
+#    define unlikely(x)     __builtin_expect(!!(x),0)
+#else
+#    define likely(x)       (x)
+#    define unlikely(x)     (x)
+#endif
+
 #if defined(__i386__) || defined(_M_IX86) || defined(_X86_) || defined(__x86_64__) || defined(_M_X64)
 #    define USE_ROTATE
 #    if defined(__GNUC__) || defined(__clang__)
 #        define USE_ASM
+#        define USE_INTRINSICS
+#        define USE_BTS
 #    endif
+#endif
+
+// Unrolled loops only on x86-64
+// Probably too much register pressure on x86
+#if defined(__x86_64__) || defined(_M_X64)
+#    define USE_UNROLLED_LOOPS
+#endif
+
+#ifdef USE_INTRINSICS
+#    include <immintrin.h>
 #endif
 
 // Check if the target platform is 64-bit
 #if defined(__x86_64__) || defined(_M_X64)
+#define USE_64BIT
 typedef unsigned long long sieve_word_t;
+typedef signed long long sieve_signed_t;
 #else
 typedef unsigned int sieve_word_t;
+typedef signed int sieve_signed_t;
+#endif
+
+static const unsigned int nWordBits = 8 * sizeof(sieve_word_t);
+static const unsigned int nWordBitsLog = (nWordBits == 64) ? 6 : 5;
+
+#ifdef USE_BTS
+// The bts instruction should be very fast starting from Intel Core 2
+inline sieve_word_t bts(sieve_word_t nr, sieve_word_t bits)
+{
+    asm ("bts %1, %0"
+                    : "+r" (bits)
+                    : "Ir" (nr)
+                    : "cc");
+    return bits;
+}
 #endif
 
 #ifdef USE_ROTATE
@@ -199,20 +237,63 @@ inline sieve_word_t rotate_left(sieve_word_t bits, unsigned int count)
 }
 #endif
 
+#if defined(USE_ASM) && defined(__BMI2__)
+#   define USE_BMI2
+#endif
+
+#if defined(USE_INTRINSICS) && defined(__SSE2__)
+#    define USE_SSE2
+#endif
+
+#if defined(USE_INTRINSICS) && defined(__AVX2__)
+#    define USE_AVX2
+#endif
+
+#if defined(USE_AVX2)
+const unsigned int nRequiredAlignment = 256;
+#elif defined(USE_SSE2)
+const unsigned int nRequiredAlignment = 128;
+#elif defined(USE_64BIT)
+const unsigned int nRequiredAlignment = 64;
+#else
+const unsigned int nRequiredAlignment = 32;
+#endif
+
+#ifdef USE_BMI2
+inline sieve_word_t shrx(sieve_word_t bits, sieve_word_t count)
+{
+    sieve_word_t result;
+    asm("shrx %2, %1, %0"
+        :"=r" (result)
+        :"r" (bits), "r" (count));
+    return result;
+}
+
+inline sieve_word_t shlx(sieve_word_t bits, sieve_word_t count)
+{
+    sieve_word_t result;
+    asm("shlx %2, %1, %0"
+        :"=r" (result)
+        :"r" (bits), "r" (count));
+    return result;
+}
+#endif
+
 class CPrimalityTestParams
 {
 public:
-    // GMP variables
-    mpz_t mpzE;
-    mpz_t mpzR;
-    mpz_t mpzRplusOne;
-
     // GMP C++ variables
     mpz_class mpzHashFixedMult;
     mpz_class mpzChainOrigin;
     mpz_class mpzOriginMinusOne;
     mpz_class mpzOriginPlusOne;
     mpz_class mpzN;
+    mpz_class mpzNMinusOne;
+    mpz_class mpzBase;
+    mpz_class mpzR;
+    mpz_class mpzR2;
+    mpz_class mpzE;
+    mpz_class mpzFrac;
 
     // Values specific to a round
     unsigned int nBits;
@@ -226,16 +307,6 @@ public:
         nBits = 0;
         nCandidateType = 0;
         nChainLength = 0;
-        mpz_init(mpzE);
-        mpz_init(mpzR);
-        mpz_init(mpzRplusOne);
-    }
-
-    ~CPrimalityTestParams()
-    {
-        mpz_clear(mpzE);
-        mpz_clear(mpzR);
-        mpz_clear(mpzRplusOne);
     }
 };
 
@@ -243,15 +314,17 @@ public:
 //
 // Includes the sieve extension feature from jhPrimeminer by jh000
 //
-// A layer of the sieve determines whether the CC1 or CC2 chain members near the
-// origin fixed_multiplier * candidate_multiplier * 2^k are known to be
-// composites.
+// Layer k of the sieve determines whether numbers of the form
+// hash * primorial * candidate * 2^k - 1 and
+// hash * primorial * candidate * 2^k + 1
+// are known to be composites.
 //
-// The default sieve is composed of layers 1 .. nChainLength.
+// The default sieve is composed of layers 1 .. nChainLength. The multipliers
+// in the default sieve are all odd.
 //
 // An extension i is composed of layers i .. i + nChainLength. The candidates
-// indexes from the extensions are multiplied by 2^i. The first half of the
-// candidates are covered by the default sieve and previous extensions.
+// indexes from the extensions are multiplied by 2^i. Therefore, the resulting
+// multipliers are always even.
 //
 // The larger numbers in the extensions have a slightly smaller probability of
 // being primes and take slightly longer to test but they can be calculated very
@@ -265,6 +338,18 @@ class CSieveOfEratosthenes
     mpz_class mpzHash; // hash of the block header
     mpz_class mpzFixedMultiplier; // fixed round multiplier
     mpz_class mpzHashFixedMult; // mpzHash * mpzFixedMultiplier
+
+    // raw and possibly unaligned pointers
+    sieve_word_t *vfRawCandidates;
+    sieve_word_t *vfRawCompositeBiTwin;
+    sieve_word_t *vfRawCompositeCunningham1;
+    sieve_word_t *vfRawCompositeCunningham2;
+    sieve_word_t *vfRawCompositeLayerCC1;
+    sieve_word_t *vfRawCompositeLayerCC2;
+    sieve_word_t *vfRawExtendedCandidates;
+    sieve_word_t *vfRawExtendedCompositeBiTwin;
+    sieve_word_t *vfRawExtendedCompositeCunningham1;
+    sieve_word_t *vfRawExtendedCompositeCunningham2;
 
     // final set of candidates for probable primality checking
     sieve_word_t *vfCandidates;
@@ -284,7 +369,6 @@ class CSieveOfEratosthenes
     unsigned int *vCunningham1Multipliers;
     unsigned int *vCunningham2Multipliers;
 
-    static const unsigned int nWordBits = 8 * sizeof(sieve_word_t);
     unsigned int nCandidatesWords;
     unsigned int nCandidatesBytes;
 
@@ -299,6 +383,7 @@ class CSieveOfEratosthenes
     unsigned int nSieveLayers; // sieve layers
     unsigned int nPrimes; // number of times to weave the sieve
     unsigned int nL1CacheElements; // number of bits that can be stored in L1 cache
+    unsigned int nMinPrimeSeq; // smallest prime which will be used for sieving
 
     CBlockIndex* pindexPrev;
 
@@ -318,34 +403,44 @@ class CSieveOfEratosthenes
         return (sieve_word_t)1 << (nBitNum % nWordBits);
     }
 
-    void ProcessMultiplier(sieve_word_t *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const std::vector<unsigned int>& vPrimes, unsigned int *vMultipliers, unsigned int nLayerSeq);
+    void ProcessMultiplier(sieve_word_t *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, unsigned int *vMultipliers, unsigned int nLayerSeq);
 
     void freeArrays()
     {
-        if (vfCandidates)
-            free(vfCandidates);
-        if (vfCompositeBiTwin)
-            free(vfCompositeBiTwin);
-        if (vfCompositeCunningham1)
-            free(vfCompositeCunningham1);
-        if (vfCompositeCunningham2)
-            free(vfCompositeCunningham2);
-        if (vfCompositeLayerCC1)
-            free(vfCompositeLayerCC1);
-        if (vfCompositeLayerCC2)
-            free(vfCompositeLayerCC2);
-        if (vfExtendedCandidates)
-            free(vfExtendedCandidates);
-        if (vfExtendedCompositeBiTwin)
-            free(vfExtendedCompositeBiTwin);
-        if (vfExtendedCompositeCunningham1)
-            free(vfExtendedCompositeCunningham1);
-        if (vfExtendedCompositeCunningham2)
-            free(vfExtendedCompositeCunningham2);
+        if (vfRawCandidates)
+            free(vfRawCandidates);
+        if (vfRawCompositeBiTwin)
+            free(vfRawCompositeBiTwin);
+        if (vfRawCompositeCunningham1)
+            free(vfRawCompositeCunningham1);
+        if (vfRawCompositeCunningham2)
+            free(vfRawCompositeCunningham2);
+        if (vfRawCompositeLayerCC1)
+            free(vfRawCompositeLayerCC1);
+        if (vfRawCompositeLayerCC2)
+            free(vfRawCompositeLayerCC2);
+        if (vfRawExtendedCandidates)
+            free(vfRawExtendedCandidates);
+        if (vfRawExtendedCompositeBiTwin)
+            free(vfRawExtendedCompositeBiTwin);
+        if (vfRawExtendedCompositeCunningham1)
+            free(vfRawExtendedCompositeCunningham1);
+        if (vfRawExtendedCompositeCunningham2)
+            free(vfRawExtendedCompositeCunningham2);
         if (vCunningham1Multipliers)
             free(vCunningham1Multipliers);
         if (vCunningham2Multipliers)
             free(vCunningham2Multipliers);
+        vfRawCandidates = NULL;
+        vfRawCompositeBiTwin = NULL;
+        vfRawCompositeCunningham1 = NULL;
+        vfRawCompositeCunningham2 = NULL;
+        vfRawCompositeLayerCC1 = NULL;
+        vfRawCompositeLayerCC2 = NULL;
+        vfRawExtendedCandidates = NULL;
+        vfRawExtendedCompositeBiTwin = NULL;
+        vfRawExtendedCompositeCunningham1 = NULL;
+        vfRawExtendedCompositeCunningham2 = NULL;
         vfCandidates = NULL;
         vfCompositeBiTwin = NULL;
         vfCompositeCunningham1 = NULL;
@@ -368,6 +463,16 @@ public:
         mpzHash = 0;
         mpzFixedMultiplier = 0;
         mpzHashFixedMult = 0;
+        vfRawCandidates = NULL;
+        vfRawCompositeBiTwin = NULL;
+        vfRawCompositeCunningham1 = NULL;
+        vfRawCompositeCunningham2 = NULL;
+        vfRawCompositeLayerCC1 = NULL;
+        vfRawCompositeLayerCC2 = NULL;
+        vfRawExtendedCandidates = NULL;
+        vfRawExtendedCompositeBiTwin = NULL;
+        vfRawExtendedCompositeCunningham1 = NULL;
+        vfRawExtendedCompositeCunningham2 = NULL;
         vfCandidates = NULL;
         vfCompositeBiTwin = NULL;
         vfCompositeCunningham1 = NULL;
@@ -395,6 +500,7 @@ public:
         nSieveLayers = 0;
         nPrimes = 0;
         nL1CacheElements = 0;
+        nMinPrimeSeq = 0;
         pindexPrev = NULL;
         fIsReady = false;
         fIsDepleted = true;
@@ -422,9 +528,10 @@ public:
         nCandidateIndex = 0;
         fCandidateIsExtended = false;
         nCandidateActiveExtension = 0;
-        nCandidatesWords = (nSieveSize + nWordBits - 1) / nWordBits;
+        nCandidatesWords = (nSieveSize + nRequiredAlignment - 1) / nRequiredAlignment * (nRequiredAlignment / nWordBits);
         nCandidatesBytes = nCandidatesWords * sizeof(sieve_word_t);
         nChainLength = TargetGetLength(nBits);
+        nMinPrimeSeq = 0;
 
         // Override target length if requested
         if (nSieveTargetLength > 0)
@@ -443,18 +550,29 @@ public:
             nSieveExtensionsPrev = nSieveExtensions;
             nMultiplierBytesPrev = nMultiplierBytes;
             freeArrays();
-            vfCandidates = (sieve_word_t *)malloc(nCandidatesBytes);
-            vfCompositeBiTwin = (sieve_word_t *)malloc(nCandidatesBytes);
-            vfCompositeCunningham1 = (sieve_word_t *)malloc(nCandidatesBytes);
-            vfCompositeCunningham2 = (sieve_word_t *)malloc(nCandidatesBytes);
-            vfCompositeLayerCC1 = (sieve_word_t *)malloc(nCandidatesBytes);
-            vfCompositeLayerCC2 = (sieve_word_t *)malloc(nCandidatesBytes);
-            vfExtendedCandidates = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes);
-            vfExtendedCompositeBiTwin = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes);
-            vfExtendedCompositeCunningham1 = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes);
-            vfExtendedCompositeCunningham2 = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes);
+            vfRawCandidates = (sieve_word_t *)malloc(nCandidatesBytes + nRequiredAlignment);
+            vfRawCompositeBiTwin = (sieve_word_t *)malloc(nCandidatesBytes + nRequiredAlignment);
+            vfRawCompositeCunningham1 = (sieve_word_t *)malloc(nCandidatesBytes + nRequiredAlignment);
+            vfRawCompositeCunningham2 = (sieve_word_t *)malloc(nCandidatesBytes + nRequiredAlignment);
+            vfRawCompositeLayerCC1 = (sieve_word_t *)malloc(nCandidatesBytes + nRequiredAlignment);
+            vfRawCompositeLayerCC2 = (sieve_word_t *)malloc(nCandidatesBytes + nRequiredAlignment);
+            vfRawExtendedCandidates = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes + nRequiredAlignment);
+            vfRawExtendedCompositeBiTwin = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes + nRequiredAlignment);
+            vfRawExtendedCompositeCunningham1 = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes + nRequiredAlignment);
+            vfRawExtendedCompositeCunningham2 = (sieve_word_t *)malloc(nSieveExtensions * nCandidatesBytes + nRequiredAlignment);
             vCunningham1Multipliers = (unsigned int *)malloc(nMultiplierBytes);
             vCunningham2Multipliers = (unsigned int *)malloc(nMultiplierBytes);
+#define ALIGN_PTR(x)    ((void *)(((uintptr_t)(x) + nRequiredAlignment - 1) / nRequiredAlignment * nRequiredAlignment))
+            vfCandidates = (sieve_word_t *)ALIGN_PTR(vfRawCandidates);
+            vfCompositeBiTwin = (sieve_word_t *)ALIGN_PTR(vfRawCompositeBiTwin);
+            vfCompositeCunningham1 = (sieve_word_t *)ALIGN_PTR(vfRawCompositeCunningham1);
+            vfCompositeCunningham2 = (sieve_word_t *)ALIGN_PTR(vfRawCompositeCunningham2);
+            vfCompositeLayerCC1 = (sieve_word_t *)ALIGN_PTR(vfRawCompositeLayerCC1);
+            vfCompositeLayerCC2 = (sieve_word_t *)ALIGN_PTR(vfRawCompositeLayerCC2);
+            vfExtendedCandidates = (sieve_word_t *)ALIGN_PTR(vfRawExtendedCandidates);
+            vfExtendedCompositeBiTwin = (sieve_word_t *)ALIGN_PTR(vfRawExtendedCompositeBiTwin);
+            vfExtendedCompositeCunningham1 = (sieve_word_t *)ALIGN_PTR(vfRawExtendedCompositeCunningham1);
+            vfExtendedCompositeCunningham2 = (sieve_word_t *)ALIGN_PTR(vfRawExtendedCompositeCunningham2);
         }
 
         // Initialize arrays
@@ -483,11 +601,19 @@ public:
 
         unsigned int nCandidates = 0;
 #ifdef USE_GCC_BUILTINS
+#    ifdef USE_64BIT
         for (unsigned int i = 0; i < nCandidatesWords; i++)
-            nCandidates += __builtin_popcountl(vfCandidates[i]);
+            nCandidates += __builtin_popcountll(vfCandidates[i]);
         for (unsigned int j = 0; j < nSieveExtensions; j++)
-            for (unsigned int i = nCandidatesWords / 2; i < nCandidatesWords; i++)
-                nCandidates += __builtin_popcountl(vfExtendedCandidates[j * nCandidatesWords + i]);
+            for (unsigned int i = 0; i < nCandidatesWords; i++)
+                nCandidates += __builtin_popcountll(vfExtendedCandidates[j * nCandidatesWords + i]);
+#    else
+        for (unsigned int i = 0; i < nCandidatesWords; i++)
+            nCandidates += __builtin_popcount(vfCandidates[i]);
+        for (unsigned int j = 0; j < nSieveExtensions; j++)
+            for (unsigned int i = 0; i < nCandidatesWords; i++)
+                nCandidates += __builtin_popcount(vfExtendedCandidates[j * nCandidatesWords + i]);
+#    endif
 #else
         for (unsigned int i = 0; i < nCandidatesWords; i++)
         {
@@ -500,7 +626,7 @@ public:
         }
         for (unsigned int j = 0; j < nSieveExtensions; j++)
         {
-            for (unsigned int i = nCandidatesWords / 2; i < nCandidatesWords; i++)
+            for (unsigned int i = 0; i < nCandidatesWords; i++)
             {
                 sieve_word_t lBits = vfExtendedCandidates[j * nCandidatesWords + i];
                 for (unsigned int j = 0; j < nWordBits; j++)
@@ -525,13 +651,16 @@ public:
         sieve_word_t *vfActiveCompositeTWN;
         sieve_word_t *vfActiveCompositeCC1;
         sieve_word_t *vfActiveCompositeCC2;
+        const sieve_word_t nMaxWord = (nSieveSize + nWordBits - 1) / nWordBits;
+        const unsigned int _nSieveSize = nSieveSize;
 
         if (fCandidateIsExtended)
         {
-            vfActiveCandidates = vfExtendedCandidates + nCandidateActiveExtension * nCandidatesWords;
-            vfActiveCompositeTWN = vfExtendedCompositeBiTwin + nCandidateActiveExtension * nCandidatesWords;
-            vfActiveCompositeCC1 = vfExtendedCompositeCunningham1 + nCandidateActiveExtension * nCandidatesWords;
-            vfActiveCompositeCC2 = vfExtendedCompositeCunningham2 + nCandidateActiveExtension * nCandidatesWords;
+            const sieve_word_t nExtOffset = nCandidateActiveExtension * nCandidatesWords;
+            vfActiveCandidates = vfExtendedCandidates + nExtOffset;
+            vfActiveCompositeTWN = vfExtendedCompositeBiTwin + nExtOffset;
+            vfActiveCompositeCC1 = vfExtendedCompositeCunningham1 + nExtOffset;
+            vfActiveCompositeCC2 = vfExtendedCompositeCunningham2 + nExtOffset;
         }
         else
         {
@@ -541,25 +670,22 @@ public:
             vfActiveCompositeCC2 = vfCompositeCunningham2;
         }
 
-        // Acquire the current word from the bitmap
-        sieve_word_t lBits = vfActiveCandidates[GetWordNum(nCandidateIndex)];
-
         loop
         {
             nCandidateIndex++;
-            if (nCandidateIndex >= nSieveSize)
+            if (unlikely(nCandidateIndex >= _nSieveSize))
             {
                 // Check if extensions are available
                 if (!fCandidateIsExtended && nSieveExtensions > 0)
                 {
                     fCandidateIsExtended = true;
                     nCandidateActiveExtension = 0;
-                    nCandidateIndex = nSieveSize / 2;
+                    nCandidateIndex = 0;
                 }
                 else if (fCandidateIsExtended && nCandidateActiveExtension + 1 < nSieveExtensions)
                 {
                     nCandidateActiveExtension++;
-                    nCandidateIndex = nSieveSize / 2;
+                    nCandidateIndex = 0;
                 }
                 else
                 {
@@ -575,10 +701,11 @@ public:
                 // Fix the pointers
                 if (fCandidateIsExtended)
                 {
-                    vfActiveCandidates = vfExtendedCandidates + nCandidateActiveExtension * nCandidatesWords;
-                    vfActiveCompositeTWN = vfExtendedCompositeBiTwin + nCandidateActiveExtension * nCandidatesWords;
-                    vfActiveCompositeCC1 = vfExtendedCompositeCunningham1 + nCandidateActiveExtension * nCandidatesWords;
-                    vfActiveCompositeCC2 = vfExtendedCompositeCunningham2 + nCandidateActiveExtension * nCandidatesWords;
+                    const sieve_word_t nExtOffset = nCandidateActiveExtension * nCandidatesWords;
+                    vfActiveCandidates = vfExtendedCandidates + nExtOffset;
+                    vfActiveCompositeTWN = vfExtendedCompositeBiTwin + nExtOffset;
+                    vfActiveCompositeCC1 = vfExtendedCompositeCunningham1 + nExtOffset;
+                    vfActiveCompositeCC2 = vfExtendedCompositeCunningham2 + nExtOffset;
                 }
                 else
                 {
@@ -587,31 +714,28 @@ public:
                     vfActiveCompositeCC1 = vfCompositeCunningham1;
                     vfActiveCompositeCC2 = vfCompositeCunningham2;
                 }
-
-                // Update the current word
-                lBits = vfActiveCandidates[GetWordNum(nCandidateIndex)];
             }
 
-            if (nCandidateIndex % nWordBits == 0)
+            if (unlikely(nCandidateIndex % nWordBits == 0))
             {
-                // Update the current word
-                lBits = vfActiveCandidates[GetWordNum(nCandidateIndex)];
-
-                // Check if any bits are set
-                if (lBits == 0)
+                sieve_word_t nWord = nCandidateIndex / nWordBits;
+                // Fast loop to skip empty words
+                for (; likely(nWord < nMaxWord); nWord++)
                 {
-                    // Skip an entire word
-                    nCandidateIndex += nWordBits - 1;
-                    continue;
+                    if (vfActiveCandidates[nWord] != 0)
+                        break;
                 }
+                nCandidateIndex = nWord * nWordBits;
+                if (nCandidateIndex >= _nSieveSize)
+                    continue;
             }
 
-            if (lBits & GetBitMask(nCandidateIndex))
+            if (unlikely((vfActiveCandidates[GetWordNum(nCandidateIndex)] & GetBitMask(nCandidateIndex)) != 0))
             {
                 if (fCandidateIsExtended)
-                    nCandidateMultiplier = nCandidateIndex * (2 << nCandidateActiveExtension);
+                    nCandidateMultiplier = (2 * nCandidateIndex + 1) * (2 << nCandidateActiveExtension);
                 else
-                    nCandidateMultiplier = nCandidateIndex;
+                    nCandidateMultiplier = 2 * nCandidateIndex + 1;
                 nVariableMultiplier = nCandidateMultiplier;
                 if (~vfActiveCompositeTWN[GetWordNum(nCandidateIndex)] & GetBitMask(nCandidateIndex))
                     nCandidateType = PRIME_CHAIN_BI_TWIN;

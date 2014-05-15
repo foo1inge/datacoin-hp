@@ -1,0 +1,99 @@
+Primecoin High Performance Changelog
+====================================
+
+Changes in -hp14:
+ * Huge CPU mining speedup. Up to 73% higher chains/day on Intel's Haswell.
+ * Developer fee is now 1% (-donationpercentage defaults to 1.0).
+ * Sieve now uses the BTS instruction (same as RapidPrime miner).
+ * Added compile-time support for using BMI2 instructions on Haswell.
+ * Added compile-time support for SSE2 and AVX2 bitwise operations.
+ * New extended sieve algorithm similar to rdebourbon's beta4 code.
+ * New default values for the tuning parameters:
+   . sievefilterprimes defaults to 14000 (up from 7849)
+   . sievesize defaults to 1376256 (up from 917504)
+   . sieveextensions defaults to 10 (up from 9)
+ * Lots of other minor improvements.
+
+Changes in -hp13:
+ * Binaries compiled with OpenSSL 1.0.1g which addresses the Heartbleed vulnerability
+ * Faster blockchain download
+
+Changes in -hp12:
+ * IMPORTANT: Fix for multiple machines doing the same work if wallet is shared.
+ * New chain statistics in debug.log.
+ * Removed 'primespersec' from the output of getmininginfo.
+ * Removed 'chainspermin' metric.
+ * Replaced -sievepercentage parameter with -sievefilterprimes.
+ * New parameter -l1cachesize for specifying the size of sieve segments.
+ * Added new blocks/day metric which tries to estimate how many blocks will be found at current difficulty.
+ * Better automatic adjustment of primorial factor.
+ * New parameter -primorial for manual adjustment of primorial.
+ * Implemented early support for v0.2 proposal (needs to be enabled with -miningprotocol=2).
+ * David's fix for getwork.
+ * Updated to Bitcoin v0.8.6 codebase.
+ * Improved the checking of BiTwin chain candidates. As a consequence, short BiTwin chains (1 or 2 primes) are now counted correctly in the mining statistics. Primes/h is now much higher due to this.
+ * The Qt application is now titled Primecoin High Performance.
+ * Fixes for Mac OS X and the Clang compiler.
+ * Revised default sieve parameters.
+ * Added an automatic donation feature when a new block is found. The -donationpercentage allows a percentage of the block reward to be donated to an address. E.g. passing the command-line parameter -donationpercentage=1.5 will donate 1.5% of every block to the developer. Alternatively, this value can be set in primecoin.conf. Also, the default address can be changed using -donationaddress.
+
+Changes in -hp11:
+ * Fixed a bug in the BiTwin filter that was inflating the chains/day estimate and reducing the chances of finding a block (thanks to rdebourbon).
+ * Slightly improved the accuracy of the prime probability estimate with regards to the 'sieveextensions' parameter.
+ * Changed the default value of 'sieveextensions' to 9.
+ * Other small fixes and improvements from cabin.
+
+Changes in -hp10:
+ * Major rewrite of the sieve to support extending the sieve (originally implemented by jh000).
+ * Added a new parameter 'sieveextensions' which controls how many times the sieve is extended.
+ * Removed the problematic and unnecessary fast-division test.
+ * Changed the value of nL1CacheElements to 224000 which is slightly faster (thanks to nushor on IRC).
+ * The 'roundsievepercentage' parameter is gone. The round primorial is now automatically adjusted.
+ * New RPC command 'listtopprimes' by Sunny.
+
+Changes in -hp9:
+ * Sunny's mining optimizations from 0.1.2.
+ * Minor mining optimizations from mtrlt and gatra.
+ * Small sieve optimizations for 32-bit processors.
+ * Sunny's new chains/day estimate.
+ * Sunny's new 'listprimerecords' RPC command.
+ * New default value for roundsievepercentage is 70 on mainnet (better chains/day, equal 5-chains/h).
+
+Changes in -hp8:
+ * IMPORTANT: Fixed loss of potential blocks caused by fractional length calculation being skipped if fast divisibility test succeeds. (Thanks to mtrlt for spotting this.)
+ * Skip fractional length calculation for the first number in a chain (as suggested by gatra).
+ * Added a new configurable round primorial adjustment system.
+ * Round primorial can be adjusted through the -roundsievepercentage parameter (default value is 30, minimum is 1, maximum is 100). The parameter depends how much time is spent running the sieve. By default 30% of time is spent in the sieve and 70% is spent on checking the candidates produced by the sieve.
+ * Lots of other performance improvements.
+ * Bigger sieve sizes should no longer crash on Windows.
+ * Added new RPC commands setsievepercentage and setroundsievepercentage for changing parameters on the fly.
+ * GMP is now included as a separate library in the binary releases.
+
+Changes in -hp7:
+ * IMPORTANT: Sunny King's fix for mining large block sizes
+ * Small performance improvement to the sieve
+
+Changes in -hp6:
+ * Added fast divisibility tests before doing the expensive Fermat's test
+ * Lots of other small optimizations
+ * Introduced a new experimental tuning parameter "sievepercentage". Default value is 10, minimum is 1, maximum is 100.
+ * Added new RPC command "getchainspermin"
+ * Added the following information to "getmininginfo": chainspermin, difficulty, sievepercentage, and sievesize
+ * Attempt to fix the random crash while mining
+
+Changes in -hp5:
+ * Added a faster 32-bit routine for inverting numbers
+ * Other minor performance improvements to the sieve
+
+Changes in -hp4:
+ * Added more L1 and L2 cache optimizations
+ * Some other minor performance improvements (including a change originally by luke-jr)
+ * New experimental performance metric 5-chains/h in debug.log
+
+Changes in -hp3:
+ * Added a new tuning parameter "sievesize". Default value is 1M, minimum is 100k, maximum is 10M.
+ * Some other minor performance improvements
+ * Merged two pull requests from geeknik that eliminate references to "Bitcoin"
+
+Changes in -hp2:
+ * Restored sieve size to 1,000,000. Quick runs on the testnet show significantly increased probable prime chain rate. Thanks to the numerous people who pointed this out.

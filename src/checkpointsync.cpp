@@ -90,6 +90,7 @@ CSyncCheckpoint checkpointMessagePending;
 uint256 hashInvalidCheckpoint = 0;
 CCriticalSection cs_hashSyncCheckpoint;
 std::string strCheckpointWarning;
+uint256 hashConnectedBlock = 0;
 
 // ppcoin: get last synchronized checkpoint
 CBlockIndex* GetLastSyncCheckpoint()
@@ -223,20 +224,38 @@ bool CheckSyncCheckpoint(const uint256& hashBlock, const CBlockIndex* pindexPrev
     assert(mapBlockIndex.count(hashSyncCheckpoint));
     const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
 
+    const CBlockIndex* pindexConnected = NULL;
+    if (hashConnectedBlock != 0 && mapBlockIndex.count(hashConnectedBlock))
+        pindexConnected = mapBlockIndex[hashConnectedBlock];
+
     if (nHeight > pindexSync->nHeight)
     {
         // trace back to same height as sync-checkpoint
         const CBlockIndex* pindex = pindexPrev;
-        while (pindex->nHeight > pindexSync->nHeight)
-            if (!(pindex = pindex->pprev))
-                return error("CheckSyncCheckpoint: pprev null - block index structure failure");
-        if (pindex->nHeight < pindexSync->nHeight || pindex->GetBlockHash() != hashSyncCheckpoint)
-            return false; // only descendant of sync-checkpoint can pass check
+        bool fIsConnected = false;
+        if (pindexConnected != NULL)
+        {
+            while (pindex->nHeight > pindexConnected->nHeight)
+                if (!(pindex = pindex->pprev))
+                    return error("CheckSyncCheckpoint: pprev null - block index structure failure");
+            if (pindex->nHeight == pindexConnected->nHeight && pindex->GetBlockHash() == hashConnectedBlock)
+                fIsConnected = true;
+        }
+        if (!fIsConnected)
+        {
+            while (pindex->nHeight > pindexSync->nHeight)
+                if (!(pindex = pindex->pprev))
+                    return error("CheckSyncCheckpoint: pprev null - block index structure failure");
+            if (pindex->nHeight < pindexSync->nHeight || pindex->GetBlockHash() != hashSyncCheckpoint)
+                return false; // only descendant of sync-checkpoint can pass check
+        }
     }
     if (nHeight == pindexSync->nHeight && hashBlock != hashSyncCheckpoint)
         return false; // same height with sync-checkpoint
     if (nHeight < pindexSync->nHeight && !mapBlockIndex.count(hashBlock))
         return false; // lower height than sync-checkpoint
+    if (nHeight > pindexSync->nHeight)
+        hashConnectedBlock = pindexPrev->GetBlockHash();
     return true;
 }
 
