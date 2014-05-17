@@ -14,4 +14,4 @@ XPM: AL1nofFch3VPvJYGNYSbKwcW9xhrtyTAAh
 
 g1g0
 
-P.S. Please note, that the default donation behaviour has changed (according to changes in Primecoin). Now it is set to 1 percent of mined coins which is sent to the DTC address above. If you don't like it, change it in the sources or specify explicitly during the normal datacoind server operation.
+P.S. Please note, that the default donation behaviour has changed (according to changes in Primecoin). Now it is set to 1 percent of mined coins which is sent to the DTC address above. If you don't like it, change it in the sources or specify explicitly during the normal datacoind server start with (not documented in the help) options: -donationpercentage - default 1, and -donationaddress.
