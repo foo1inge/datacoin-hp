@@ -38,6 +38,7 @@ LIBS += \
  $(DEPSDIR)/lib/libboost_program_options-mt.a \
  $(DEPSDIR)/lib/libboost_thread-mt.a \
  $(DEPSDIR)/lib/libboost_chrono-mt.a \
+ $(DEPSDIR)/lib/libboost_timer-mt.a \
  $(DEPSDIR)/lib/libssl.a \
  $(DEPSDIR)/lib/libcrypto.a \
  -lz
@@ -51,6 +52,7 @@ LIBS += \
  -lboost_program_options-mt \
  -lboost_thread-mt \
  -lboost_chrono-mt \
+ -lboost_timer-mt \
  -lssl \
  -lcrypto \
  -lgmp \
@@ -64,7 +66,7 @@ ifdef RELEASE
 # Compile for maximum compatibility and smallest size.
 # This requires that dependencies are compiled
 # the same way.
-CFLAGS = -mmacosx-version-min=10.5 -arch i386 -O3
+CFLAGS = -mmacosx-version-min=10.6 -arch i386 -O2
 else
 DEBUGFLAGS = -g
 endif

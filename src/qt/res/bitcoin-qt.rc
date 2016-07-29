@@ -21,13 +21,13 @@ BEGIN
         BLOCK "040904E4" // U.S. English - multilingual (hex)
         BEGIN
             VALUE "CompanyName",        "Datacoin"
-            VALUE "FileDescription",    "Datacoin-Qt (OSS GUI client for Datacoin)"
+            VALUE "FileDescription",    "Datacoin High Performance-Qt"
             VALUE "FileVersion",        VER_FILEVERSION_STR
-            VALUE "InternalName",       "datacoin-qt"
+            VALUE "InternalName",       "datacoin-hp-qt"
             VALUE "LegalCopyright",     COPYRIGHT_STR
             VALUE "LegalTrademarks1",   "Distributed under conditional MIT/X11 software license, see the accompanying file COPYING."
             VALUE "OriginalFilename",   "datacoin-qt.exe"
-            VALUE "ProductName",        "Datacoin-Qt"
+            VALUE "ProductName",        "Datacoin High Performance-Qt"
             VALUE "ProductVersion",     VER_PRODUCTVERSION_STR
         END
     END

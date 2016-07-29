@@ -248,7 +248,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     </message>
     <message>
         <location line="+1"/>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR DATACOINS&lt;/b&gt;!</source>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR PRIMECOINS&lt;/b&gt;!</source>
         <translation>警告: 如果將錢包加密後忘記密碼, 你會&lt;b&gt;失去其中所有的位元幣&lt;/b&gt;!</translation>
     </message>
     <message>
@@ -755,8 +755,8 @@ Address: %4
     <message>
         <location filename="../guiutil.cpp" line="+424"/>
         <location line="+12"/>
-        <source>Datacoin-Qt</source>
-        <translation>位元幣-Qt</translation>
+        <source>Datacoin High Performance-Qt</source>
+        <translation>Datacoin High Performance-Qt</translation>
     </message>
     <message>
         <location line="-12"/>
@@ -2187,8 +2187,8 @@ Address: %4
     <name>datacoin-core</name>
     <message>
         <location filename="../bitcoinstrings.cpp" line="+94"/>
-        <source>Datacoin version</source>
-        <translation>位元幣版本</translation>
+        <source>Datacoin High Performance version</source>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+102"/>

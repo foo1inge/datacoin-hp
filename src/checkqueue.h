@@ -168,6 +168,7 @@ public:
         // passed queue is supposed to be unused, or NULL
         if (pqueue != NULL) {
             pqueue->controlMutex.lock();
+            boost::unique_lock<boost::mutex> lock(pqueue->mutex);
             assert(pqueue->nTotal == pqueue->nIdle);
             assert(pqueue->nTodo == 0);
             assert(pqueue->fAllOk == true);

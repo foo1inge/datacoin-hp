@@ -61,8 +61,8 @@ CMedianFilter<int> cPeerBlockCounts(8, 0); // Amount of blocks that other nodes 
 map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
 
-map<uint256, CDataStream*> mapOrphanTransactions;
-map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
+map<uint256, CTransaction> mapOrphanTransactions;
+map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
 
 // Constant stuff for coinbase transactions we create:
 CScript COINBASE_FLAGS;
@@ -70,8 +70,8 @@ CScript COINBASE_FLAGS;
 const string strMessageMagic = "Datacoin Signed Message:\n";
 
 double dPrimesPerSec = 0.0;
-double dChainsPerMinute = 0.0;
 double dChainsPerDay = 0.0;
+double dBlocksPerDay = 0.0;
 int64 nHPSTimerStart = 0;
 
 // Settings
@@ -288,15 +288,11 @@ CBlockTreeDB *pblocktree = NULL;
 // mapOrphanTransactions
 //
 
-bool AddOrphanTx(const CDataStream& vMsg)
+bool AddOrphanTx(const CTransaction& tx)
 {
-    CTransaction tx;
-    CDataStream(vMsg) >> tx;
     uint256 hash = tx.GetHash();
     if (mapOrphanTransactions.count(hash))
         return false;
-
-    CDataStream* pvMsg = new CDataStream(vMsg);
 
     // Ignore big transactions, to avoid a
     // send-big-orphans memory exhaustion attack. If a peer has a legitimate
@@ -305,16 +301,16 @@ bool AddOrphanTx(const CDataStream& vMsg)
     // have been mined or received.
     // 10,000 orphans, each of which is at most 5,000 bytes big is
     // at most 500 megabytes of orphans:
-    if (pvMsg->size() > 5000)
+    unsigned int sz = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
+    if (sz > 5000)
     {
-        printf("ignoring large orphan tx (size: %"PRIszu", hash: %s)\n", pvMsg->size(), hash.ToString().c_str());
-        delete pvMsg;
+        printf("ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString().c_str());
         return false;
     }
 
-    mapOrphanTransactions[hash] = pvMsg;
+    mapOrphanTransactions[hash] = tx;
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
-        mapOrphanTransactionsByPrev[txin.prevout.hash].insert(make_pair(hash, pvMsg));
+        mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
     printf("stored orphan tx %s (mapsz %"PRIszu")\n", hash.ToString().c_str(),
         mapOrphanTransactions.size());
@@ -325,16 +321,13 @@ void static EraseOrphanTx(uint256 hash)
 {
     if (!mapOrphanTransactions.count(hash))
         return;
-    const CDataStream* pvMsg = mapOrphanTransactions[hash];
-    CTransaction tx;
-    CDataStream(*pvMsg) >> tx;
+    const CTransaction& tx = mapOrphanTransactions[hash];
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
     {
         mapOrphanTransactionsByPrev[txin.prevout.hash].erase(hash);
         if (mapOrphanTransactionsByPrev[txin.prevout.hash].empty())
             mapOrphanTransactionsByPrev.erase(txin.prevout.hash);
     }
-    delete pvMsg;
     mapOrphanTransactions.erase(hash);
 }
 
@@ -345,7 +338,7 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans)
     {
         // Evict a random orphan:
         uint256 randomhash = GetRandHash();
-        map<uint256, CDataStream*>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
+        map<uint256, CTransaction>::iterator it = mapOrphanTransactions.lower_bound(randomhash);
         if (it == mapOrphanTransactions.end())
             it = mapOrphanTransactions.begin();
         EraseOrphanTx(it->first);
@@ -371,44 +364,58 @@ bool CTxOut::IsDust() const
     // which has units satoshis-per-kilobyte.
     // If you'd pay more than 1/3 in fees
     // to spend something, then we consider it dust.
-    // A typical txout is 33 bytes big, and will
+    // A typical txout is 34 bytes big, and will
     // need a CTxIn of at least 148 bytes to spend,
     // so dust is a txout less than 54 uBTC
-    // (5430 satoshis) with default nMinRelayTxFee
+    // (5460 satoshis) with default nMinRelayTxFee
     return ((nValue*1000)/(3*((int)GetSerializeSize(SER_DISK,0)+148)) < CTransaction::nMinRelayTxFee);
 }
 
-bool CTransaction::IsStandard() const
+bool CTransaction::IsStandard(string& strReason) const
 {
-    if (nVersion > CTransaction::CURRENT_VERSION)
+    if (nVersion > CTransaction::CURRENT_VERSION || nVersion < 1) {
+        strReason = "version";
         return false;
+    }
 
-    if (!IsFinal())
+    if (!IsFinal()) {
+        strReason = "not-final";
         return false;
+    }
 
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
     unsigned int sz = this->GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
-    if (sz >= MAX_STANDARD_TX_SIZE)
+    if (sz >= MAX_STANDARD_TX_SIZE) {
+        strReason = "tx-size";
         return false;
+    }
 
     BOOST_FOREACH(const CTxIn& txin, vin)
     {
         // Biggest 'standard' txin is a 3-signature 3-of-3 CHECKMULTISIG
         // pay-to-script-hash, which is 3 ~80-byte signatures, 3
         // ~65-byte public keys, plus a few script ops.
-        if (txin.scriptSig.size() > 500)
+        if (txin.scriptSig.size() > 500) {
+            strReason = "scriptsig-size";
             return false;
-        if (!txin.scriptSig.IsPushOnly())
+        }
+        if (!txin.scriptSig.IsPushOnly()) {
+            strReason = "scriptsig-not-pushonly";
             return false;
+        }
     }
     BOOST_FOREACH(const CTxOut& txout, vout) {
-        if (!::IsStandard(txout.scriptPubKey))
+        if (!::IsStandard(txout.scriptPubKey)) {
+            strReason = "scriptpubkey";
             return false;
-        if (txout.IsDust())
+        }
+        if (txout.IsDust()) {
+            strReason = "dust";
             return false;
+        }
     }
     return true;
 }
@@ -606,23 +613,20 @@ int64 CTransaction::GetMinFee(unsigned int nBlockSize, bool fAllowFree,
 
     if (fAllowFree)
     {
-        if (nBlockSize == 1)
-        {
-            // Transactions under 10K are free
-            // (about 4500 BTC if made of 50 BTC inputs)
-            if (nBytes < 10000)
-                nMinFee = 0;
-        }
-        else
-        {
-            // Free transaction area
-            if (nNewBlockSize < 27000)
-                nMinFee = 0;
-        }
+        // There is a free transaction area in blocks created by most miners,
+        // * If we are relaying we allow transactions up to DEFAULT_BLOCK_PRIORITY_SIZE - 1000
+        //   to be considered to fall into this category. We don't want to encourage sending
+        //   multiple transactions instead of one big transaction to avoid fees.
+        // * If we are creating a transaction we allow transactions up to 1,000 bytes
+        //   to be considered safe and assume they can likely make it into this section.
+        if (nBytes < (mode == GMF_SEND ? 1000 : (DEFAULT_BLOCK_PRIORITY_SIZE - 1000)))
+            nMinFee = 0;
     }
 
-    // To limit dust spam, require base fee if any output is less than 0.01
-    if (nMinFee < nBaseFee)
+    // This code can be removed after enough miners have upgraded to version 0.9.
+    // Until then, be safe when sending and require a fee if any output
+    // is less than CENT:
+    if (nMinFee < nBaseFee && mode == GMF_SEND)
     {
         BOOST_FOREACH(const CTxOut& txout, vout)
             if (txout.nValue < CENT)
@@ -673,8 +677,10 @@ bool CTxMemPool::accept(CValidationState &state, CTransaction &tx, bool fCheckIn
         return error("CTxMemPool::accept() : not accepting nLockTime beyond 2038 yet");
 
     // Rather not work on nonstandard transactions (unless -testnet)
-    if (!fTestNet && !tx.IsStandard())
-        return error("CTxMemPool::accept() : nonstandard transaction type");
+    string strNonStd;
+    if (!fTestNet && !tx.IsStandard(strNonStd))
+        return error("CTxMemPool::accept() : nonstandard transaction (%s)",
+                     strNonStd.c_str());
 
     // is it already in the memory pool?
     uint256 hash = tx.GetHash();
@@ -814,9 +820,6 @@ bool CTxMemPool::accept(CValidationState &state, CTransaction &tx, bool fCheckIn
         EraseFromWallets(ptxOld->GetHash());
     SyncWithWallets(hash, tx, NULL, true);
 
-    printf("CTxMemPool::accept() : accepted %s (poolsz %"PRIszu")\n",
-           hash.ToString().c_str(),
-           mapTx.size());
     return true;
 }
 
@@ -849,15 +852,15 @@ bool CTxMemPool::remove(const CTransaction &tx, bool fRecursive)
     {
         LOCK(cs);
         uint256 hash = tx.GetHash();
+        if (fRecursive) {
+            for (unsigned int i = 0; i < tx.vout.size(); i++) {
+                std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(hash, i));
+                if (it != mapNextTx.end())
+                    remove(*it->second.ptx, true);
+            }
+        }
         if (mapTx.count(hash))
         {
-            if (fRecursive) {
-                for (unsigned int i = 0; i < tx.vout.size(); i++) {
-                    std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(hash, i));
-                    if (it != mapNextTx.end())
-                        remove(*it->second.ptx, true);
-                }
-            }
             BOOST_FOREACH(const CTxIn& txin, tx.vin)
                 mapNextTx.erase(txin.prevout);
             mapTx.erase(hash);
@@ -1448,6 +1451,11 @@ bool CBlock::DisconnectBlock(CValidationState &state, CBlockIndex *pindex, CCoin
         CCoins &outs = view.GetCoins(hash);
 
         CCoins outsBlock = CCoins(tx, pindex->nHeight);
+        // The CCoins serialization does not serialize negative numbers.
+        // No network rules currently depend on the version here, so an inconsistency is harmless
+        // but it must be corrected before txout nversion ever influences a network rule.
+        if (outsBlock.nVersion < 0)
+            outs.nVersion = outsBlock.nVersion;
         if (outs != outsBlock)
             fClean = fClean && error("DisconnectBlock() : added transaction mismatch? database corrupted");
 
@@ -1738,7 +1746,7 @@ bool SetBestChain(CValidationState &state, CBlockIndex* pindexNew)
     }
 
     // Disconnect shorter branch
-    vector<CTransaction> vResurrect;
+    list<CTransaction> vResurrect;
     BOOST_FOREACH(CBlockIndex* pindex, vDisconnect) {
         CBlock block;
         if (!block.ReadFromDisk(pindex))
@@ -1752,9 +1760,9 @@ bool SetBestChain(CValidationState &state, CBlockIndex* pindexNew)
         // Queue memory transactions to resurrect.
         // We only do this for blocks after the last checkpoint (reorganisation before that
         // point should only happen with -reindex/-loadblock, or a misbehaving peer.
-        BOOST_FOREACH(const CTransaction& tx, block.vtx)
+        BOOST_REVERSE_FOREACH(const CTransaction& tx, block.vtx)
             if (!tx.IsCoinBase() && pindex->nHeight > Checkpoints::GetTotalBlocksEstimate())
-                vResurrect.push_back(tx);
+                vResurrect.push_front(tx);
     }
 
     // Connect longer branch
@@ -1820,7 +1828,9 @@ bool SetBestChain(CValidationState &state, CBlockIndex* pindexNew)
     BOOST_FOREACH(CTransaction& tx, vResurrect) {
         // ignore validation errors in resurrected transactions
         CValidationState stateDummy;
-        tx.AcceptToMemoryPool(stateDummy, true, false);
+        if (!tx.AcceptToMemoryPool(stateDummy, true, false))
+            mempool.remove(tx, true);
+
     }
 
     // Delete redundant memory transactions that are in the connected branch
@@ -2075,7 +2085,7 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
         uniqueTx.insert(GetTxHash(i));
     }
     if (uniqueTx.size() != vtx.size())
-        return state.DoS(100, error("CheckBlock() : duplicate transaction"));
+        return state.DoS(100, error("CheckBlock() : duplicate transaction"), true);
 
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, vtx)
@@ -2142,7 +2152,8 @@ bool CBlock::AcceptBlock(CValidationState &state, CDiskBlockPos *dbp)
                 (fTestNet && CBlockIndex::IsSuperMajority(2, pindexPrev, 51, 100)))
             {
                 CScript expect = CScript() << nHeight;
-                if (!std::equal(expect.begin(), expect.end(), vtx[0].vin[0].scriptSig.begin()))
+                if (vtx[0].vin[0].scriptSig.size() < expect.size() ||
+                    !std::equal(expect.begin(), expect.end(), vtx[0].vin[0].scriptSig.begin()))
                     return state.DoS(100, error("AcceptBlock() : block height mismatch in coinbase"));
             }
         }
@@ -2196,9 +2207,9 @@ CBigNum CBlockIndex::GetBlockWork() const
     //   fractional multiplier = 1 / meeting target rate
     //       = (TransitionRatio * FractionalDiff) / (TransitionRatio - 1 + FractionalDiff)
     uint64 nFractionalDifficulty = TargetGetFractionalDifficulty(nBits);
-    CBigNum bnWork = 256;
-    for (unsigned int nCount = nTargetMinLength; nCount < TargetGetLength(nBits); nCount++)
-        bnWork *= nWorkTransitionRatio;
+    unsigned int nWorkExp = 8;
+    nWorkExp += nWorkTransitionRatioLog * (TargetGetLength(nBits) - nTargetMinLength);
+    CBigNum bnWork = CBigNum(1) << nWorkExp;
     bnWork *= ((uint64) nWorkTransitionRatio) * nFractionalDifficulty;
     bnWork /= (((uint64) nWorkTransitionRatio - 1) * nFractionalDifficultyMin + nFractionalDifficulty);
     return bnWork;
@@ -2714,6 +2725,7 @@ bool LoadBlockIndex()
 
     // Primecoin: Generate prime table when starting up
     GeneratePrimeTable();
+    InitPrimeMiner();
 
     //
     // Load block index from databases
@@ -3169,6 +3181,9 @@ void static ProcessGetData(CNode* pfrom)
 
             // Track requests for our stuff.
             Inventory(inv.hash);
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
+                break;
+
         }
     }
 
@@ -3228,8 +3243,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             pfrom->nVersion = 300;
         if (!vRecv.empty())
             vRecv >> addrFrom >> nNonce;
-        if (!vRecv.empty())
+        if (!vRecv.empty()) {
             vRecv >> pfrom->strSubVer;
+            pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
+        }
         if (!vRecv.empty())
             vRecv >> pfrom->nStartingHeight;
         if (!vRecv.empty())
@@ -3304,7 +3321,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         pfrom->fSuccessfullyConnected = true;
 
-        printf("receive version message: version %d, blocks=%d, us=%s, them=%s, peer=%s\n", pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString().c_str(), addrFrom.ToString().c_str(), pfrom->addr.ToString().c_str());
+        printf("receive version message: %s: version %d, blocks=%d, us=%s, them=%s, peer=%s\n", pfrom->cleanSubVer.c_str(), pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString().c_str(), addrFrom.ToString().c_str(), pfrom->addr.ToString().c_str());
 
         cPeerBlockCounts.input(pfrom->nStartingHeight);
 
@@ -3547,54 +3564,49 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
 
-        // Truncate messages to the size of the tx in them
-        unsigned int nSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-        unsigned int oldSize = vMsg.size();
-        if (nSize < oldSize) {
-            vMsg.resize(nSize);
-            printf("truncating oversized TX %s (%u -> %u)\n",
-                   tx.GetHash().ToString().c_str(),
-                   oldSize, nSize);
-        }
-
         bool fMissingInputs = false;
         CValidationState state;
         if (tx.AcceptToMemoryPool(state, true, true, &fMissingInputs))
         {
-            RelayTransaction(tx, inv.hash, vMsg);
+            RelayTransaction(tx, inv.hash);
             mapAlreadyAskedFor.erase(inv);
             vWorkQueue.push_back(inv.hash);
             vEraseQueue.push_back(inv.hash);
+
+            printf("AcceptToMemoryPool: %s %s : accepted %s (poolsz %"PRIszu")\n",
+                pfrom->addr.ToString().c_str(), pfrom->cleanSubVer.c_str(),
+                tx.GetHash().ToString().c_str(),
+                mempool.mapTx.size());
 
             // Recursively process any orphan transactions that depended on this one
             for (unsigned int i = 0; i < vWorkQueue.size(); i++)
             {
                 uint256 hashPrev = vWorkQueue[i];
-                for (map<uint256, CDataStream*>::iterator mi = mapOrphanTransactionsByPrev[hashPrev].begin();
+                for (set<uint256>::iterator mi = mapOrphanTransactionsByPrev[hashPrev].begin();
                      mi != mapOrphanTransactionsByPrev[hashPrev].end();
                      ++mi)
                 {
-                    const CDataStream& vMsg = *((*mi).second);
-                    CTransaction tx;
-                    CDataStream(vMsg) >> tx;
-                    CInv inv(MSG_TX, tx.GetHash());
+                    const uint256& orphanHash = *mi;
+                    const CTransaction& orphanTx = mapOrphanTransactions[orphanHash];
                     bool fMissingInputs2 = false;
-                    // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get anyone relaying LegitTxX banned)
+                    // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan 
+                    // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get 
+                    // anyone relaying LegitTxX banned)
                     CValidationState stateDummy;
 
                     if (tx.AcceptToMemoryPool(stateDummy, true, true, &fMissingInputs2))
                     {
-                        printf("   accepted orphan tx %s\n", inv.hash.ToString().c_str());
-                        RelayTransaction(tx, inv.hash, vMsg);
-                        mapAlreadyAskedFor.erase(inv);
-                        vWorkQueue.push_back(inv.hash);
-                        vEraseQueue.push_back(inv.hash);
+                        printf("   accepted orphan tx %s\n", orphanHash.ToString().c_str());
+                        RelayTransaction(orphanTx, orphanHash);
+                        mapAlreadyAskedFor.erase(CInv(MSG_TX, orphanHash));
+                        vWorkQueue.push_back(orphanHash);
+                        vEraseQueue.push_back(orphanHash);
                     }
                     else if (!fMissingInputs2)
                     {
                         // invalid or too-little-fee orphan
-                        vEraseQueue.push_back(inv.hash);
-                        printf("   removed orphan tx %s\n", inv.hash.ToString().c_str());
+                        vEraseQueue.push_back(orphanHash);
+                        printf("   removed orphan tx %s\n", orphanHash.ToString().c_str());
                     }
                 }
             }
@@ -3604,16 +3616,21 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         }
         else if (fMissingInputs)
         {
-            AddOrphanTx(vMsg);
+            AddOrphanTx(tx);
 
             // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
             unsigned int nEvicted = LimitOrphanTxSize(MAX_ORPHAN_TRANSACTIONS);
             if (nEvicted > 0)
                 printf("mapOrphan overflow, removed %u tx\n", nEvicted);
         }
-        int nDoS;
+        int nDoS = 0;
         if (state.IsInvalid(nDoS))
-            pfrom->Misbehaving(nDoS);
+        {
+            printf("%s from %s %s was not accepted into the memory pool\n", tx.GetHash().ToString().c_str(),
+                pfrom->addr.ToString().c_str(), pfrom->cleanSubVer.c_str());
+            if (nDoS > 0)
+                pfrom->Misbehaving(nDoS);
+        }
     }
 
 
@@ -3629,11 +3646,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         pfrom->AddInventoryKnown(inv);
 
         CValidationState state;
-        if (ProcessBlock(state, pfrom, &block))
+        if (ProcessBlock(state, pfrom, &block) || state.CorruptionPossible())
             mapAlreadyAskedFor.erase(inv);
-        int nDoS;
+        int nDoS = 0;
         if (state.IsInvalid(nDoS))
-            pfrom->Misbehaving(nDoS);
+            if (nDoS > 0)
+                pfrom->Misbehaving(nDoS);
+
     }
 
 
@@ -3747,6 +3766,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             LOCK(pfrom->cs_filter);
             delete pfrom->pfilter;
             pfrom->pfilter = new CBloomFilter(filter);
+            pfrom->pfilter->UpdateEmptyFull();
         }
         pfrom->fRelayTxes = true;
     }
@@ -3776,7 +3796,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     {
         LOCK(pfrom->cs_filter);
         delete pfrom->pfilter;
-        pfrom->pfilter = NULL;
+        pfrom->pfilter = new CBloomFilter();
         pfrom->fRelayTxes = true;
     }
 
@@ -3814,6 +3834,9 @@ bool ProcessMessages(CNode* pfrom)
 
     if (!pfrom->vRecvGetData.empty())
         ProcessGetData(pfrom);
+
+    // this maintains the order of responses
+    if (!pfrom->vRecvGetData.empty()) return fOk;
 
     std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
     while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
@@ -3905,6 +3928,8 @@ bool ProcessMessages(CNode* pfrom)
 
         if (!fRet)
             printf("ProcessMessage(%s, %u bytes) FAILED\n", strCommand.c_str(), nMessageSize);
+
+        break;
     }
 
     // In case the connection got shut down, its receive buffer was wiped
@@ -4218,13 +4243,20 @@ CBlockTemplate* CreateNewBlock(CReserveKey& reservekey)
         return NULL;
     txNew.vout[0].scriptPubKey << pubkey << OP_CHECKSIG;
 
+    // Datacoin HP: Optional automatic donations with every block found
+    if (dDonationPercentage > 0.001)
+    {
+        txNew.vout.resize(2);
+        txNew.vout[1].scriptPubKey.SetDestination(donationAddress.Get());
+    }
+
     // Add our coinbase tx as first transaction
     pblock->vtx.push_back(txNew);
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
     // Largest block you're willing to create:
-    unsigned int nBlockMaxSize = GetArg("-blockmaxsize", MAX_BLOCK_SIZE_GEN/2);
+    unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
     // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
     nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(MAX_BLOCK_SIZE-1000), nBlockMaxSize));
 
@@ -4234,7 +4266,7 @@ CBlockTemplate* CreateNewBlock(CReserveKey& reservekey)
 
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
-    unsigned int nBlockPrioritySize = GetArg("-blockprioritysize", 27000);
+    unsigned int nBlockPrioritySize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
     nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
 
     // Minimum block size you want to create; block will be filled with free transactions
@@ -4424,7 +4456,19 @@ CBlockTemplate* CreateNewBlock(CReserveKey& reservekey)
         if (fDebug && GetBoolArg("-printmining"))
             printf("CreateNewBlock(): total size %"PRI64u"\n", nBlockSize);
         pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock);
-        pblock->vtx[0].vout[0].nValue = GetBlockValue(pblock->nBits, nFees);
+        int64 nBlockValue = GetBlockValue(pblock->nBits, nFees);
+        // Datacoin HP: Optional automatic donations with every block found
+        if (dDonationPercentage > 0.001)
+        {
+            int64 nDonationValue = nBlockValue * dDonationPercentage / 100.0;
+            // Make sure the transaction will be valid
+            nDonationValue = std::max(nDonationValue, MIN_TXOUT_AMOUNT);
+            nDonationValue = std::min(nDonationValue, nBlockValue - MIN_TXOUT_AMOUNT);
+            pblock->vtx[0].vout[0].nValue = nBlockValue - nDonationValue;
+            pblock->vtx[0].vout[1].nValue = nDonationValue;
+        }
+        else
+            pblock->vtx[0].vout[0].nValue = nBlockValue;
         pblocktemplate->vTxFees[0] = -nFees;
 
         // Fill in header
@@ -4447,11 +4491,11 @@ CBlockTemplate* CreateNewBlock(CReserveKey& reservekey)
 }
 
 
-void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce)
+void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce, bool fNoReset)
 {
     // Update nExtraNonce
     static uint256 hashPrevBlock;
-    if (hashPrevBlock != pblock->hashPrevBlock)
+    if (!fNoReset && hashPrevBlock != pblock->hashPrevBlock)
     {
         nExtraNonce = 0;
         hashPrevBlock = pblock->hashPrevBlock;
@@ -4551,6 +4595,9 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 
 void static BitcoinMiner(CWallet *pwallet)
 {
+    static CCriticalSection cs;
+    static bool fTimerStarted = false;
+    bool fPrintStatsAtEnd = false;
     printf("DatacoinMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
     RenameThread("datacoin-miner");
@@ -4560,9 +4607,57 @@ void static BitcoinMiner(CWallet *pwallet)
     unsigned int nExtraNonce = 0;
 
     unsigned int nPrimorialMultiplier = nPrimorialHashFactor;
-    double dTimeExpected = 0;   // time expected to prime chain (micro-second)
-    int64 nSieveGenTime = 0; // how many milliseconds sieve generation took
-    bool fIncrementPrimorial = true; // increase or decrease primorial factor
+    int nAdjustPrimorial = 1; // increase or decrease primorial factor
+    const unsigned int nRoundSamples = 40; // how many rounds to sample before adjusting primorial
+    double dSumBlockExpected = 0.0; // sum of expected blocks
+    int64 nSumRoundTime = 0; // sum of round times
+    unsigned int nRoundNum = 0; // number of rounds
+    double dAverageBlockExpectedPrev = 0.0; // previous average expected blocks per second
+    unsigned int nPrimorialMultiplierPrev = nPrimorialMultiplier; // previous primorial factor
+
+    // Primecoin HP: Increase initial primorial
+    if (fTestNet)
+        nPrimorialMultiplier = nInitialPrimorialMultiplierTestnet;
+    else
+        nPrimorialMultiplier = nInitialPrimorialMultiplier;
+
+    // Primecoin: Check if a fixed primorial was requested
+    unsigned int nFixedPrimorial = (unsigned int)GetArg("-primorial", 0);
+    if (nFixedPrimorial > 0)
+    {
+        nFixedPrimorial = std::max(nFixedPrimorial, nPrimorialHashFactor);
+        nPrimorialMultiplier = nFixedPrimorial;
+    }
+
+    // Primecoin: Allow choosing the mining protocol version
+    unsigned int nMiningProtocol = (unsigned int)GetArg("-miningprotocol", 1);
+
+    // Primecoin: Allocate data structures for mining
+    CSieveOfEratosthenes sieve;
+    CPrimalityTestParams testParams;
+
+    if (!fTimerStarted)
+    {
+        LOCK(cs);
+        if (!fTimerStarted)
+        {
+            fTimerStarted = true;
+            minerTimer.start();
+
+            // First thread will print the stats
+            fPrintStatsAtEnd = true;
+        }
+    }
+
+    // Many machines may be using the same key if they are sharing the same wallet
+    // Make extra nonce unique by setting it to a modulo of the high resolution clock's value
+    const unsigned int nExtraNonceModulo = 10000000;
+    boost::chrono::high_resolution_clock::time_point time_now = boost::chrono::high_resolution_clock::now();
+    boost::chrono::nanoseconds ns_now = boost::chrono::duration_cast<boost::chrono::nanoseconds>(time_now.time_since_epoch());
+    nExtraNonce = ns_now.count() % nExtraNonceModulo;
+
+    // Print the chosen extra nonce for debugging
+    printf("BitcoinMiner() : Setting initial extra nonce to %u\n", nExtraNonce);
 
     try { loop {
         while (vNodes.empty())
@@ -4584,7 +4679,7 @@ void static BitcoinMiner(CWallet *pwallet)
         if (!pblocktemplate.get())
             return;
         CBlock *pblock = &pblocktemplate->block;
-        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce, true);
 
         if (fDebug && GetBoolArg("-printmining"))
             printf("Running DatacoinMiner with %"PRIszu" transactions in block (%u bytes)\n", pblock->vtx.size(),
@@ -4595,31 +4690,31 @@ void static BitcoinMiner(CWallet *pwallet)
         //
         int64 nStart = GetTime();
         bool fNewBlock = true;
-        unsigned int nTriedMultiplier = 0;
 
         // Primecoin: try to find hash divisible by primorial
         unsigned int nHashFactor = PrimorialFast(nPrimorialHashFactor);
 
-        // Based on mustyoshi's patch from https://bitcointalk.org/index.php?topic=251850.msg2689981#msg2689981
-        uint256 phash;
         mpz_class mpzHash;
         loop {
-            // Fast loop
+            pblock->nNonce++;
             if (pblock->nNonce >= 0xffff0000)
                 break;
 
             // Check that the hash meets the minimum
-            phash = pblock->GetHeaderHash();
-            if (phash < hashBlockHeaderLimit) {
-                pblock->nNonce++;
+            uint256 phash = pblock->GetHeaderHash();
+            if (phash < hashBlockHeaderLimit)
                 continue;
-            }
 
-            // Check that the hash is divisible by the fixed primorial
             mpz_set_uint256(mpzHash.get_mpz_t(), phash);
-            if (!mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) {
-                pblock->nNonce++;
-                continue;
+            if (nMiningProtocol >= 2) {
+                // Primecoin: Mining protocol v0.2
+                // Try to find hash that is probable prime
+                if (!ProbablePrimalityTestWithTrialDivision(mpzHash, 1000, testParams))
+                    continue;
+            } else {
+                // Primecoin: Check that the hash is divisible by the fixed primorial
+                if (!mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor))
+                    continue;
             }
 
             // Use the hash that passed the tests
@@ -4629,6 +4724,7 @@ void static BitcoinMiner(CWallet *pwallet)
             continue;
         // Primecoin: primorial fixed multiplier
         mpz_class mpzPrimorial;
+        mpz_class mpzFixedMultiplier;
         unsigned int nRoundTests = 0;
         unsigned int nRoundPrimesHit = 0;
         int64 nPrimeTimerStart = GetTimeMicros();
@@ -4638,85 +4734,98 @@ void static BitcoinMiner(CWallet *pwallet)
         {
             unsigned int nTests = 0;
             unsigned int nPrimesHit = 0;
-            unsigned int nChainsHit = 0;
-
-            // Primecoin: adjust round primorial so that the generated prime candidates meet the minimum
-            mpz_class mpzMultiplierMin = mpzPrimeMin * nHashFactor / mpzHash + 1;
-            while (mpzPrimorial < mpzMultiplierMin)
-            {
-                if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
-                    error("DatacoinMiner() : primorial minimum overflow");
-                Primorial(nPrimorialMultiplier, mpzPrimorial);
-            }
-            mpz_class mpzFixedMultiplier;
-            if (mpzPrimorial > nHashFactor) {
-                mpzFixedMultiplier = mpzPrimorial / nHashFactor;
-            } else {
-                mpzFixedMultiplier = 1;
-            }
-
-            // Primecoin: mine for prime chain
-            unsigned int nProbableChainLength;
-            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, nChainsHit, mpzHash, nPrimorialMultiplier, nSieveGenTime, pindexPrev))
-            {
-                SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                CheckWork(pblock, *pwalletMain, reservekey);
-                SetThreadPriority(THREAD_PRIORITY_LOWEST);
-                break;
-            }
-            nRoundTests += nTests;
-            nRoundPrimesHit += nPrimesHit;
+            unsigned int vChainsFound[nMaxChainLength];
+            for (unsigned int i = 0; i < nMaxChainLength; i++)
+                vChainsFound[i] = 0;
 
             // Meter primes/sec
-            static volatile int64 nPrimeCounter;
-            static volatile int64 nTestCounter;
-            static volatile int64 nChainCounter;
-            static double dChainExpected;
+            static volatile int64 nPrimeCounter = 0;
+            static volatile int64 nTestCounter = 0;
+            static volatile double dChainExpected = 0.0;
+            static volatile double dBlockExpected = 0.0;
+            static volatile unsigned int vFoundChainCounter[nMaxChainLength];
             int64 nMillisNow = GetTimeMillis();
             if (nHPSTimerStart == 0)
             {
                 nHPSTimerStart = nMillisNow;
                 nPrimeCounter = 0;
                 nTestCounter = 0;
-                nChainCounter = 0;
-                dChainExpected = 0;
+                dChainExpected = 0.0;
+                dBlockExpected = 0.0;
+                for (unsigned int i = 0; i < nMaxChainLength; i++)
+                    vFoundChainCounter[i] = 0;
             }
+
+            // Primecoin: Mining protocol v0.2
+            if (nMiningProtocol >= 2)
+                mpzFixedMultiplier = mpzPrimorial;
             else
             {
-#ifdef __GNUC__
-                // Use atomic increment
-                __sync_add_and_fetch(&nPrimeCounter, nPrimesHit);
-                __sync_add_and_fetch(&nTestCounter, nTests);
-                __sync_add_and_fetch(&nChainCounter, nChainsHit);
-#else
-                nPrimeCounter += nPrimesHit;
-                nTestCounter += nTests;
-                nChainCounter += nChainsHit;
-#endif
+                if (mpzPrimorial > nHashFactor)
+                    mpzFixedMultiplier = mpzPrimorial / nHashFactor;
+                else
+                    mpzFixedMultiplier = 1;
             }
+
+            // Primecoin: mine for prime chain
+            if (MineProbablePrimeChain(*pblock, mpzFixedMultiplier, fNewBlock, nTests, nPrimesHit, mpzHash, pindexPrev, vChainsFound, sieve, testParams))
+            {
+                SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                nTotalBlocksFound++;
+                CheckWork(pblock, *pwalletMain, reservekey);
+                SetThreadPriority(THREAD_PRIORITY_LOWEST);
+            }
+            nRoundTests += nTests;
+            nRoundPrimesHit += nPrimesHit;
+
+#ifdef USE_GCC_BUILTINS
+            // Use atomic increment
+            __sync_add_and_fetch(&nPrimeCounter, nPrimesHit);
+            __sync_add_and_fetch(&nTestCounter, nTests);
+            __sync_add_and_fetch(&nTotalTests, nTests);
+            for (unsigned int i = 0; i < nMaxChainLength; i++)
+            {
+                __sync_add_and_fetch(&vTotalChainsFound[i], vChainsFound[i]);
+                __sync_add_and_fetch(&vFoundChainCounter[i], vChainsFound[i]);
+            }
+#else
+            nPrimeCounter += nPrimesHit;
+            nTestCounter += nTests;
+            nTotalTests += nTests;
+            for (unsigned int i = 0; i < nMaxChainLength; i++)
+            {
+                vTotalChainsFound[i] += vChainsFound[i];
+                vFoundChainCounter[i] += vChainsFound[i];
+            }
+#endif
+
+            nMillisNow = GetTimeMillis();
             if (nMillisNow - nHPSTimerStart > 60000)
             {
-                static CCriticalSection cs;
+                LOCK(cs);
+                nMillisNow = GetTimeMillis();
+                if (nMillisNow - nHPSTimerStart > 60000)
                 {
-                    LOCK(cs);
-                    if (nMillisNow - nHPSTimerStart > 60000)
+                    int64 nTimeDiffMillis = nMillisNow - nHPSTimerStart;
+                    nHPSTimerStart = nMillisNow;
+                    double dPrimesPerMinute = 60000.0 * nPrimeCounter / nTimeDiffMillis;
+                    dPrimesPerSec = dPrimesPerMinute / 60.0;
+                    double dTestsPerMinute = 60000.0 * nTestCounter / nTimeDiffMillis;
+                    dChainsPerDay = 86400000.0 * dChainExpected / nTimeDiffMillis;
+                    dBlocksPerDay = 86400000.0 * dBlockExpected / nTimeDiffMillis;
+                    nPrimeCounter = 0;
+                    nTestCounter = 0;
+                    dChainExpected = 0;
+                    dBlockExpected = 0;
+                    static int64 nLogTime = 0;
+                    if (nMillisNow - nLogTime > 59000)
                     {
-                        double dPrimesPerMinute = 60000.0 * nPrimeCounter / (nMillisNow - nHPSTimerStart);
-                        dPrimesPerSec = dPrimesPerMinute / 60.0;
-                        double dTestsPerMinute = 60000.0 * nTestCounter / (nMillisNow - nHPSTimerStart);
-                        dChainsPerMinute = 60000.0 * nChainCounter / (nMillisNow - nHPSTimerStart);
-                        dChainsPerDay = 86400000.0 * dChainExpected / (GetTimeMillis() - nHPSTimerStart);
-                        nHPSTimerStart = nMillisNow;
-                        nPrimeCounter = 0;
-                        nTestCounter = 0;
-                        nChainCounter = 0;
-                        dChainExpected = 0;
-                        static int64 nLogTime = 0;
-                        if (nMillisNow - nLogTime > 59000)
-                        {
-                            nLogTime = nMillisNow;
-                            printf("%s primemeter %9.0f prime/h %9.0f test/h %4.0f %d-chains/h %3.6f chain/d\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLogTime / 1000).c_str(), dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0, dChainsPerMinute * 60.0, nStatsChainLength, dChainsPerDay);
-                        }
+                        nLogTime = nMillisNow;
+                        if (fLogTimestamps)
+                            printf("primemeter %9.0f prime/h %9.0f test/h %3.8f chain/d %3.8f block/d\n", dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0, dChainsPerDay, dBlocksPerDay);
+                        else
+                            printf("%s primemeter %9.0f prime/h %9.0f test/h %3.8f chain/d %3.8f block/d\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLogTime / 1000).c_str(), dPrimesPerMinute * 60.0, dTestsPerMinute * 60.0, dChainsPerDay, dBlocksPerDay);
+                        PrintCompactStatistics(vFoundChainCounter);
                     }
                 }
             }
@@ -4735,49 +4844,101 @@ void static BitcoinMiner(CWallet *pwallet)
             {
                 // Primecoin: a sieve+primality round completes
                 // Primecoin: estimate time to block
-                const double dTimeExpectedPrev = dTimeExpected;
                 unsigned int nCalcRoundTests = max(1u, nRoundTests);
                 // Make sure the estimated time is very high if only 0 primes were found
                 if (nRoundPrimesHit == 0)
                     nCalcRoundTests *= 1000;
                 int64 nRoundTime = (GetTimeMicros() - nPrimeTimerStart); 
-                dTimeExpected = (double) nRoundTime / nCalcRoundTests;
+                double dTimeExpected = (double) nRoundTime / nCalcRoundTests;
                 double dRoundChainExpected = (double) nRoundTests;
-                for (unsigned int n = 0, nTargetLength = TargetGetLength(pblock->nBits); n < nTargetLength; n++)
+                unsigned int nTargetLength = TargetGetLength(pblock->nBits);
+                unsigned int nRequestedLength = nTargetLength;
+                // Override target length if requested
+                if (nSieveTargetLength > 0)
+                    nRequestedLength = nSieveTargetLength;
+                // Calculate expected number of chains for requested length
+                for (unsigned int n = 0; n < nRequestedLength; n++)
                 {
-                    double dPrimeProbability = EstimateCandidatePrimeProbability(nPrimorialMultiplier, n);
-                    dTimeExpected = dTimeExpected / max(0.01, dPrimeProbability);
+                    double dPrimeProbability = EstimateCandidatePrimeProbability(nPrimorialMultiplier, n, nMiningProtocol);
+                    dTimeExpected /= dPrimeProbability;
                     dRoundChainExpected *= dPrimeProbability;
                 }
                 dChainExpected += dRoundChainExpected;
+                // Calculate expected number of blocks
+                double dRoundBlockExpected = dRoundChainExpected;
+                for (unsigned int n = nRequestedLength; n < nTargetLength; n++)
+                {
+                    double dPrimeProbability = EstimateNormalPrimeProbability(nPrimorialMultiplier, n, nMiningProtocol);
+                    dTimeExpected /= dPrimeProbability;
+                    dRoundBlockExpected *= dPrimeProbability;
+                }
+                // Calculate the effect of fractional difficulty
+                double dFractionalDiff = GetPrimeDifficulty(pblock->nBits) - nTargetLength;
+                double dExtraPrimeProbability = EstimateNormalPrimeProbability(nPrimorialMultiplier, nTargetLength, nMiningProtocol);
+                double dDifficultyFactor = ((1.0 - dFractionalDiff) * (1.0 - dExtraPrimeProbability) + dExtraPrimeProbability);
+                dRoundBlockExpected *= dDifficultyFactor;
+                dTimeExpected /= dDifficultyFactor;
+                dBlockExpected += dRoundBlockExpected;
+                // Calculate the sum of expected blocks and time
+                dSumBlockExpected += dRoundBlockExpected;
+                nSumRoundTime += nRoundTime;
+                nRoundNum++;
+                if (nRoundNum >= nRoundSamples)
+                {
+                    // Calculate average expected blocks per time
+                    double dAverageBlockExpected = dSumBlockExpected / ((double) nSumRoundTime / 1000000.0);
+                    // Compare to previous value
+                    if (dAverageBlockExpected > dAverageBlockExpectedPrev)
+                        nAdjustPrimorial = (nPrimorialMultiplier >= nPrimorialMultiplierPrev) ? 1 : -1;
+                    else
+                        nAdjustPrimorial = (nPrimorialMultiplier >= nPrimorialMultiplierPrev) ? -1 : 1;
+                    if (fDebug && GetBoolArg("-printprimorial"))
+                        printf("PrimecoinMiner() : Rounds total: num=%u primorial=%u block/s=%3.12f\n", nRoundNum, nPrimorialMultiplier, dAverageBlockExpected);
+                    // Store the new value and reset
+                    dAverageBlockExpectedPrev = dAverageBlockExpected;
+                    nPrimorialMultiplierPrev = nPrimorialMultiplier;
+                    dSumBlockExpected = 0.0;
+                    nSumRoundTime = 0;
+                    nRoundNum = 0;
+                }
                 if (fDebug && GetBoolArg("-printmining"))
                 {
-                    double dPrimeProbabilityBegin = EstimateCandidatePrimeProbability(nPrimorialMultiplier, 0);
-                    unsigned int nTargetLength = TargetGetLength(pblock->nBits);
-                    double dPrimeProbabilityEnd = EstimateCandidatePrimeProbability(nPrimorialMultiplier, nTargetLength - 1);
-                    printf("DatacoinMiner() : Round primorial=%u tests=%u primes=%u time=%uus pprob=%1.6f pprob2=%1.6f tochain=%6.3fd expect=%3.9f\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, dPrimeProbabilityBegin, dPrimeProbabilityEnd, ((dTimeExpected/1000000.0))/86400.0, dRoundChainExpected);
+                    double dPrimeProbabilityBegin = EstimateCandidatePrimeProbability(nPrimorialMultiplier, 0, nMiningProtocol);
+                    double dPrimeProbabilityEnd = EstimateCandidatePrimeProbability(nPrimorialMultiplier, nTargetLength - 1, nMiningProtocol);
+                    printf("DataMiner() : Round primorial=%u tests=%u primes=%u time=%uus pprob=%1.6f pprob2=%1.6f pprobextra=%1.6f tochain=%6.3fd expect=%3.12f expectblock=%3.12f\n", nPrimorialMultiplier, nRoundTests, nRoundPrimesHit, (unsigned int) nRoundTime, dPrimeProbabilityBegin, dPrimeProbabilityEnd, dExtraPrimeProbability, ((dTimeExpected/1000000.0))/86400.0, dRoundChainExpected, dRoundBlockExpected);
+
                 }
+
+                // Primecoin: primorial always needs to be incremented if only 0 primes were found
+                if (nRoundPrimesHit == 0)
+                    nAdjustPrimorial = 1;
+
+                // Primecoin: reset sieve+primality round timer
+                nPrimeTimerStart = GetTimeMicros();
+                nRoundTests = 0;
+                nRoundPrimesHit = 0;
 
                 // Primecoin: update time and nonce
                 pblock->nTime = max(pblock->nTime, (unsigned int) GetAdjustedTime());
-                pblock->nNonce++;
                 loop {
-                    // Fast loop
+                    pblock->nNonce++;
                     if (pblock->nNonce >= 0xffff0000)
                         break;
 
                     // Check that the hash meets the minimum
-                    phash = pblock->GetHeaderHash();
-                    if (phash < hashBlockHeaderLimit) {
-                        pblock->nNonce++;
+                    uint256 phash = pblock->GetHeaderHash();
+                    if (phash < hashBlockHeaderLimit)
                         continue;
-                    }
-
-                    // Check that the hash is divisible by the fixed primorial
                     mpz_set_uint256(mpzHash.get_mpz_t(), phash);
-                    if (!mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) {
-                        pblock->nNonce++;
-                        continue;
+                    if (nMiningProtocol >= 2) {
+                        // Primecoin: Mining protocol v0.2
+                        // Try to find hash that is probable prime
+                        if (!ProbablePrimalityTestWithTrialDivision(mpzHash, 1000, testParams))
+                            continue;
+                    } else {
+                        // Primecoin: Check that the hash is divisible by the fixed primorial
+                        if (!mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor))
+                            continue;
                     }
 
                     // Use the hash that passed the tests
@@ -4786,30 +4947,22 @@ void static BitcoinMiner(CWallet *pwallet)
                 if (pblock->nNonce >= 0xffff0000)
                     break;
 
-                // Primecoin: reset sieve+primality round timer
-                nPrimeTimerStart = GetTimeMicros();
-                if (dTimeExpected > dTimeExpectedPrev)
-                    fIncrementPrimorial = !fIncrementPrimorial;
-
-                // Primecoin: primorial always needs to be incremented if only 0 primes were found
-                if (nRoundPrimesHit == 0)
-                    fIncrementPrimorial = true;
-
-                nRoundTests = 0;
-                nRoundPrimesHit = 0;
-
                 // Primecoin: dynamic adjustment of primorial multiplier
-                if (fIncrementPrimorial)
-                {
-                    if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
-                        error("DatacoinMiner() : primorial increment overflow");
+                if (nFixedPrimorial == 0 && nAdjustPrimorial != 0) {
+                    if (nAdjustPrimorial > 0)
+                    {
+                        if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
+                            error("DatacoinMiner() : primorial increment overflow");
+                    }
+                    else if (nPrimorialMultiplier > nPrimorialHashFactor)
+                    {
+                        if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
+                            error("DatacoinMiner() : primorial decrement overflow");
+                    }
+                    Primorial(nPrimorialMultiplier, mpzPrimorial);
+                    nAdjustPrimorial = 0;
+
                 }
-                else if (nPrimorialMultiplier > nPrimorialHashFactor)
-                {
-                    if (!PrimeTableGetPreviousPrime(nPrimorialMultiplier))
-                        error("DatacoinMiner() : primorial decrement overflow");
-                }
-                Primorial(nPrimorialMultiplier, mpzPrimorial);
             }
         }
 
@@ -4817,6 +4970,12 @@ void static BitcoinMiner(CWallet *pwallet)
     catch (boost::thread_interrupted)
     {
         printf("DatacoinMiner terminated\n");
+        // Print statistics
+        if (fPrintStatsAtEnd)
+        {
+            PrintMinerStatistics();
+            fTimerStarted = false;
+        }
         throw;
     }
 }
@@ -4917,9 +5076,6 @@ public:
         mapOrphanBlocks.clear();
 
         // orphan transactions
-        std::map<uint256, CDataStream*>::iterator it3 = mapOrphanTransactions.begin();
-        for (; it3 != mapOrphanTransactions.end(); it3++)
-            delete (*it3).second;
         mapOrphanTransactions.clear();
     }
 } instance_of_cmaincleanup;

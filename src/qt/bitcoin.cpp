@@ -31,10 +31,12 @@
 #define _BITCOIN_QT_PLUGINS_INCLUDED
 #define __INSURE__
 #include <QtPlugin>
+#ifndef BITCOIN_QT_NO_CODECS
 Q_IMPORT_PLUGIN(qcncodecs)
 Q_IMPORT_PLUGIN(qjpcodecs)
 Q_IMPORT_PLUGIN(qtwcodecs)
 Q_IMPORT_PLUGIN(qkrcodecs)
+#endif
 Q_IMPORT_PLUGIN(qtaccessiblewidgets)
 #endif
 
@@ -153,9 +155,9 @@ int main(int argc, char *argv[])
     QApplication::setOrganizationName("Datacoin");
     QApplication::setOrganizationDomain("datacoin has no domain yet");
     if(GetBoolArg("-testnet")) // Separate UI settings for testnet
-        QApplication::setApplicationName("Datacoin-Qt-testnet");
+        QApplication::setApplicationName("Datacoin-HP-Qt-testnet");
     else
-        QApplication::setApplicationName("Datacoin-Qt");
+        QApplication::setApplicationName("Datacoin-HP-Qt");
 
     // ... then GUI settings:
     OptionsModel optionsModel;

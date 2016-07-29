@@ -25,13 +25,21 @@ class CAutoBN_CTX
 protected:
     BN_CTX* pctx;
     BN_CTX* operator=(BN_CTX* pnew) { return pctx = pnew; }
+    inline void must_init()
+    {
+        if (!pctx)
+        {
+            pctx = BN_CTX_new();
+            if (pctx == NULL)
+                throw bignum_error("CAutoBN_CTX : BN_CTX_new() returned NULL");
+        }
+    }
 
 public:
     CAutoBN_CTX()
     {
-        pctx = BN_CTX_new();
-        if (pctx == NULL)
-            throw bignum_error("CAutoBN_CTX : BN_CTX_new() returned NULL");
+        // Lazy initialization
+        pctx = NULL;
     }
 
     ~CAutoBN_CTX()
@@ -40,9 +48,9 @@ public:
             BN_CTX_free(pctx);
     }
 
-    operator BN_CTX*() { return pctx; }
-    BN_CTX& operator*() { return *pctx; }
-    BN_CTX** operator&() { return &pctx; }
+    operator BN_CTX*() { must_init(); return pctx; }
+    BN_CTX& operator*() { must_init(); return *pctx; }
+    BN_CTX** operator&() { must_init(); return &pctx; }
     bool operator!() { return (pctx == NULL); }
 };
 
@@ -51,6 +59,9 @@ public:
 class CBigNum : public BIGNUM
 {
 public:
+    // Reusable BN_CTX for better performance
+    CAutoBN_CTX pctx;
+
     CBigNum()
     {
         BN_init(this);
@@ -430,7 +441,6 @@ public:
 
     CBigNum& operator*=(const CBigNum& b)
     {
-        CAutoBN_CTX pctx;
         if (!BN_mul(this, this, &b, pctx))
             throw bignum_error("CBigNum::operator*= : BN_mul failed");
         return *this;
@@ -540,27 +550,24 @@ inline const CBigNum operator-(const CBigNum& a)
 
 inline const CBigNum operator*(const CBigNum& a, const CBigNum& b)
 {
-    CAutoBN_CTX pctx;
     CBigNum r;
-    if (!BN_mul(&r, &a, &b, pctx))
+    if (!BN_mul(&r, &a, &b, r.pctx))
         throw bignum_error("CBigNum::operator* : BN_mul failed");
     return r;
 }
 
 inline const CBigNum operator/(const CBigNum& a, const CBigNum& b)
 {
-    CAutoBN_CTX pctx;
     CBigNum r;
-    if (!BN_div(&r, NULL, &a, &b, pctx))
+    if (!BN_div(&r, NULL, &a, &b, r.pctx))
         throw bignum_error("CBigNum::operator/ : BN_div failed");
     return r;
 }
 
 inline const CBigNum operator%(const CBigNum& a, const CBigNum& b)
 {
-    CAutoBN_CTX pctx;
     CBigNum r;
-    if (!BN_mod(&r, &a, &b, pctx))
+    if (!BN_mod(&r, &a, &b, r.pctx))
         throw bignum_error("CBigNum::operator% : BN_div failed");
     return r;
 }
